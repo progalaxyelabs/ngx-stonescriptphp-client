@@ -1,4 +1,6 @@
-# ProgalaxyClientCore
+# ngx-stonescriptphp-client
+
+An Angular library for StoneScriptPHP client integration. Published as `@progalaxyelabs/ngx-stonescriptphp-client` on npm.
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 16.2.7.
 

@@ -1,5 +1,5 @@
 {
-  "name": "progalaxy-client-common",
+  "name": "@progalaxyelabs/ngx-stonescriptphp-client",
   "version": "0.0.5",
   "scripts": {
     "ng": "ng",
