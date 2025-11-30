@@ -50,4 +50,5 @@ firebase.json
 *-debug.log
 .runtimeconfig.json
 
-.angular
+.angular.project-id
+.project-id

@@ -1,0 +1,94 @@
+# project-info.yaml
+# Human-readable project metadata and configuration
+# Auto-generated from .project-id and database metadata
+
+# REQUIRED FIELDS
+# ===============
+
+# Project code in format: XXXX-NNN
+project_code: "PGXY-002"
+
+# Project name (matches directory name)
+name: "progalaxy-client-common-dev"
+
+# Project type: platform | interconnected | standalone
+type: "standalone"
+
+# Project status: production | active-dev | staging | maintenance | paused | archived | planning | unknown
+status: "maintenance"
+
+
+# BASIC METADATA
+# ==============
+
+# Human-readable project title
+title: "Progalaxy-client-common-dev"
+
+# Brief project description
+description: "Project progalaxy-client-common-dev - library"
+
+# Project version (semantic versioning recommended)
+version: "1.0.0"
+
+# Creation date (ISO 8601 format: YYYY-MM-DD)
+created: "2024-01-01"
+
+# Last modified date (ISO 8601 format: YYYY-MM-DD)
+last_modified: "2025-11-25"
+
+
+# BUSINESS CLASSIFICATION
+# =======================
+
+# Domain category
+domain: "ed-tech"
+
+# Project purpose: product | client-project | internal-tool | poc | experiment | library | marketing | unknown
+purpose: "library"
+
+# Business model: b2b-saas | b2c-saas | b2b-one-off | b2c-one-off | marketplace | internal | unknown
+business_model: "internal"
+
+# Ownership: progalaxy | client | partner | open-source | unknown
+ownership: "unknown"
+
+# Revenue priority: p0-critical | p1-high | p2-medium | p3-low | p4-none | unknown
+revenue_priority: "p4-none"
+
+
+# TECHNICAL DETAILS
+# =================
+
+# Primary technology stack
+tech_stack:
+  frontend: "None"
+  backend: "None"
+  database: "None"
+  runtime: "Docker"
+
+# Deployment tier: tier-0-static | tier-1-simple | tier-2-database | tier-3-services | tier-4-distributed | library | unknown
+deployment_tier: "tier-1-spa"
+
+
+# GIT & REPOSITORY
+# ================
+
+repository:
+  type: "git"
+  remote: "origin"
+  branch: "main"
+
+
+# NOTES & ADDITIONAL INFO
+# ========================
+
+notes: |
+  Auto-generated from .project-id file and database metadata on 2025-11-29.
+  This file should be updated with additional project details as needed.
+
+
+# MIGRATION FROM .project-id
+# ===========================
+#
+# This file was generated from .project-id: PGXY-002
+# The .project-id file can now be deleted after verification.
