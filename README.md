@@ -1,4 +1,5 @@
 # ngx-stonescriptphp-client
+<<<<<<< HEAD
 
 An Angular library for StoneScriptPHP client integration. Published as `@stonescriptphp/ngx-client` on npm.
 
@@ -41,3 +42,6 @@ Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To u
 ## Further help
 
 To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+=======
+Angular client library for StoneScriptPHP backend framework
+>>>>>>> ffb7fcd850bb8c8e9f2effde2857169c9e0af929
