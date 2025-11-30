@@ -9,7 +9,7 @@
 project_code: "PGXY-002"
 
 # Project name (matches directory name)
-name: "progalaxy-client-common-dev"
+name: "ngx-stonescriptphp-client"
 
 # Project type: platform | interconnected | standalone
 type: "standalone"
@@ -22,10 +22,10 @@ status: "maintenance"
 # ==============
 
 # Human-readable project title
-title: "Progalaxy-client-common-dev"
+title: "ngx-stonescriptphp-client"
 
 # Brief project description
-description: "Project progalaxy-client-common-dev - library"
+description: "Angular client library for StoneScriptPHP backend framework"
 
 # Project version (semantic versioning recommended)
 version: "1.0.0"
@@ -41,7 +41,7 @@ last_modified: "2025-11-25"
 # =======================
 
 # Domain category
-domain: "ed-tech"
+domain: "tools"
 
 # Project purpose: product | client-project | internal-tool | poc | experiment | library | marketing | unknown
 purpose: "library"
@@ -50,7 +50,7 @@ purpose: "library"
 business_model: "internal"
 
 # Ownership: progalaxy | client | partner | open-source | unknown
-ownership: "unknown"
+ownership: "progalaxy"
 
 # Revenue priority: p0-critical | p1-high | p2-medium | p3-low | p4-none | unknown
 revenue_priority: "p4-none"
