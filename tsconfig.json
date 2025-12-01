@@ -4,8 +4,8 @@
   "compilerOptions": {
     "baseUrl": "./",
     "paths": {
-      "progalaxy-client-common": [
-        "dist/progalaxy-client-common"
+      "@progalaxyelabs/ngx-stonescriptphp-client": [
+        "dist/ngx-stonescriptphp-client"
       ]
     },
     "outDir": "./dist/out-tsc",

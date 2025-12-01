@@ -3,23 +3,23 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "progalaxy-client-common": {
+    "ngx-stonescriptphp-client": {
       "projectType": "library",
-      "root": "projects/progalaxy-client-common",
-      "sourceRoot": "projects/progalaxy-client-common/src",
+      "root": "projects/ngx-stonescriptphp-client",
+      "sourceRoot": "projects/ngx-stonescriptphp-client/src",
       "prefix": "lib",
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:ng-packagr",
           "options": {
-            "project": "projects/progalaxy-client-common/ng-package.json"
+            "project": "projects/ngx-stonescriptphp-client/ng-package.json"
           },
           "configurations": {
             "production": {
-              "tsConfig": "projects/progalaxy-client-common/tsconfig.lib.prod.json"
+              "tsConfig": "projects/ngx-stonescriptphp-client/tsconfig.lib.prod.json"
             },
             "development": {
-              "tsConfig": "projects/progalaxy-client-common/tsconfig.lib.json"
+              "tsConfig": "projects/ngx-stonescriptphp-client/tsconfig.lib.json"
             }
           },
           "defaultConfiguration": "production"
@@ -27,7 +27,7 @@
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
           "options": {
-            "tsConfig": "projects/progalaxy-client-common/tsconfig.spec.json",
+            "tsConfig": "projects/ngx-stonescriptphp-client/tsconfig.spec.json",
             "polyfills": [
               "zone.js",
               "zone.js/testing"

@@ -10,10 +10,10 @@ import { MyEnvironmentModel } from '../my-environment.model';
         CommonModule
     ]
 })
-export class ProgalaxyClientCommonModule {
-    public static forRoot(environment: MyEnvironmentModel): ModuleWithProviders<ProgalaxyClientCommonModule> {
+export class NgxStoneScriptPhpClientModule {
+    public static forRoot(environment: MyEnvironmentModel): ModuleWithProviders<NgxStoneScriptPhpClientModule> {
         return {
-            ngModule: ProgalaxyClientCommonModule,
+            ngModule: NgxStoneScriptPhpClientModule,
             providers: [
                 { provide: MyEnvironmentModel, useValue: environment }
             ]

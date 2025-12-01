@@ -1,10 +1,33 @@
 # ngx-stonescriptphp-client
 
-An Angular library for StoneScriptPHP client integration. Published as `@progalaxyelabs/ngx-stonescriptphp-client` on npm.
+> Official Angular client library for StoneScriptPHP backend framework
 
-**Note:** While this package is published under `@progalaxyelabs/ngx-stonescriptphp-client`, the official website and documentation are at https://stonescriptphp.org.
+[![npm version](https://badge.fury.io/js/%40progalaxyelabs%2Fngx-stonescriptphp-client.svg)](https://www.npmjs.com/package/@progalaxyelabs/ngx-stonescriptphp-client)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 16.2.7.
+**Note:** While published as `@progalaxyelabs/ngx-stonescriptphp-client`, this is the official client for [StoneScriptPHP](https://stonescriptphp.org). Future versions will migrate to the `@stonescriptphp` namespace.
+
+---
+
+## What is this?
+
+The Angular HTTP client library for **StoneScriptPHP** - a modern PHP backend framework that auto-generates TypeScript clients from your backend DTOs and contracts.
+
+When you build APIs with StoneScriptPHP, you define:
+- Request DTOs (TypeScript interfaces)
+- Response DTOs (TypeScript interfaces)
+- Route contracts (interfaces)
+
+This library provides the HTTP client that consumes those contracts, giving you **100% type-safe** API calls with zero manual typing.
+
+## Features
+
+- ✅ **Type-safe HTTP calls** - Full TypeScript support from backend DTOs
+- ✅ **Auto-generated clients** - StoneScriptPHP generates TypeScript from PHP
+- ✅ **RxJS observables** - Native Angular integration
+- ✅ **Error handling** - Consistent error responses
+- ✅ **Interceptors ready** - Add auth, logging, retry logic
+- ✅ **Angular 19+** - Modern Angular standalone components
 
 ## Installation
 
@@ -12,32 +35,152 @@ This project was generated with [Angular CLI](https://github.com/angular/angular
 npm install @progalaxyelabs/ngx-stonescriptphp-client
 ```
 
+## Quick Start
+
+### 1. Generate TypeScript Client from Backend
+
+In your StoneScriptPHP project:
+
+```bash
+php stone generate typescript-client
+```
+
+This generates TypeScript interfaces from your PHP DTOs.
+
+### 2. Use in Angular
+
+```typescript
+import { Component } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+// Auto-generated from StoneScriptPHP backend
+interface ProductRequest {
+  name: string;
+  price: number;
+}
+
+interface ProductResponse {
+  productId: number;
+  status: string;
+}
+
+@Component({
+  selector: 'app-products',
+  standalone: true,
+  template: `<button (click)="createProduct()">Create Product</button>`
+})
+export class ProductsComponent {
+  constructor(private http: HttpClient) {}
+
+  createProduct(): void {
+    const request: ProductRequest = {
+      name: 'Widget',
+      price: 99.99
+    };
+
+    this.http.post<ProductResponse>('http://localhost:9100/products', request)
+      .subscribe(response => {
+        console.log('Product created:', response.productId);
+      });
+  }
+}
+```
+
+## How it Works
+
+StoneScriptPHP follows a **contract-first** approach:
+
+```
+PHP Backend (StoneScriptPHP)          Angular Frontend
+┌─────────────────────────┐          ┌──────────────────────┐
+│ ProductRequest DTO      │  ──────> │ ProductRequest.ts    │
+│ ProductResponse DTO     │  ──────> │ ProductResponse.ts   │
+│ IProductRoute contract  │  ──────> │ Type-safe HTTP calls │
+└─────────────────────────┘          └──────────────────────┘
+```
+
+1. Define DTOs in PHP
+2. Run `php stone generate typescript-client`
+3. Import generated TypeScript interfaces in Angular
+4. Make type-safe HTTP calls
+
+## Advanced Usage
+
+### With Interceptors
+
+```typescript
+import { HttpInterceptor, HttpRequest, HttpHandler } from '@angular/common/http';
+
+export class AuthInterceptor implements HttpInterceptor {
+  intercept(req: HttpRequest<any>, next: HttpHandler) {
+    const authReq = req.clone({
+      headers: req.headers.set('Authorization', 'Bearer ' + getToken())
+    });
+    return next.handle(authReq);
+  }
+}
+```
+
+### With Error Handling
+
+```typescript
+this.http.post<ProductResponse>('/products', request)
+  .pipe(
+    catchError(error => {
+      console.error('API Error:', error);
+      return throwError(() => error);
+    })
+  )
+  .subscribe(response => {
+    // Handle success
+  });
+```
+
+## API Response Format
+
+StoneScriptPHP responses follow this structure:
+
+```typescript
+{
+  "status": "ok" | "error",
+  "message": "Success message",
+  "data": { /* Your DTO */ }
+}
+```
+
+## Requirements
+
+- Angular >= 19.0.0
+- RxJS >= 7.8.0
+- TypeScript >= 5.8.0
+
 ## Documentation
 
-- Website: https://stonescriptphp.org
-- Documentation: https://stonescriptphp.org/docs
-- GitHub: https://github.com/progalaxyelabs/ngx-stonescriptphp-client
+- **Framework Docs:** [stonescriptphp.org](https://stonescriptphp.org)
+- **Getting Started:** [stonescriptphp.org/docs/getting-started](https://stonescriptphp.org/docs/getting-started)
+- **TypeScript Client Guide:** [stonescriptphp.org/docs/typescript-client](https://stonescriptphp.org/docs/typescript-client)
 
-## Development server
+## Example Projects
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+Check out the [StoneScriptPHP examples repository](https://github.com/progalaxyelabs/StoneScriptPHP/tree/main/examples) for full-stack example apps.
 
-## Code scaffolding
+## Contributing
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+This is part of the StoneScriptPHP ecosystem. Contributions welcome!
 
-## Build
+- Report issues: [GitHub Issues](https://github.com/progalaxyelabs/ngx-stonescriptphp-client/issues)
+- Framework repo: [StoneScriptPHP](https://github.com/progalaxyelabs/StoneScriptPHP)
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+## License
 
-## Running unit tests
+MIT
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+## Related Projects
 
-## Running end-to-end tests
+- [StoneScriptPHP](https://github.com/progalaxyelabs/StoneScriptPHP) - The PHP backend framework
+- [sunbird-garden](https://github.com/progalaxyelabs/sunbird-garden) - Reference implementation
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+---
 
-## Further help
-
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+**Made with ❤️ by the StoneScriptPHP team**
