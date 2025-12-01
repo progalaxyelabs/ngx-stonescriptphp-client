@@ -1,16 +1,15 @@
 # ngx-stonescriptphp-client
-<<<<<<< HEAD
 
-An Angular library for StoneScriptPHP client integration. Published as `@stonescriptphp/ngx-client` on npm.
+An Angular library for StoneScriptPHP client integration. Published as `@progalaxyelabs/ngx-stonescriptphp-client` on npm.
 
-**Note:** While this package is published under `@progalaxyelabs/ngx-stonescriptphp-client`, the official website and documentation are at https://stonescriptphp.org. A future migration to the `@stonescriptphp` namespace is planned.
+**Note:** While this package is published under `@progalaxyelabs/ngx-stonescriptphp-client`, the official website and documentation are at https://stonescriptphp.org.
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 16.2.7.
 
 ## Installation
 
 ```bash
-npm install @stonescriptphp/ngx-client
+npm install @progalaxyelabs/ngx-stonescriptphp-client
 ```
 
 ## Documentation
@@ -42,6 +41,3 @@ Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To u
 ## Further help
 
 To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
-=======
-Angular client library for StoneScriptPHP backend framework
->>>>>>> ffb7fcd850bb8c8e9f2effde2857169c9e0af929
