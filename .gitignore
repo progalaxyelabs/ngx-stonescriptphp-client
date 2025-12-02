@@ -6,6 +6,10 @@
 /out-tsc
 /bazel-out
 
+# Build artifacts (legacy package name)
+progalaxy-client-common/
+*.tgz
+
 # Node
 /node_modules
 npm-debug.log
