@@ -29,4 +29,28 @@ export class ApiResponse<DataType> {
         }
         return this
     }
+
+    isSuccess(): boolean {
+        return this.status === 'ok'
+    }
+
+    isError(): boolean {
+        return this.status === 'error' || this.status === 'not ok'
+    }
+
+    getData(): DataType | null {
+        return this.data || null
+    }
+
+    getError(): string {
+        return this.message || 'Unknown error'
+    }
+
+    getStatus(): string {
+        return this.status
+    }
+
+    getMessage(): string {
+        return this.message
+    }
 }

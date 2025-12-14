@@ -19,6 +19,16 @@ export class TokenService {
         localStorage.setItem(this.lsRefreshTokenKey, refreshToken)
     }
 
+    setAccessToken(accessToken: string) {
+        this.accessToken = accessToken
+        localStorage.setItem(this.lsAccessTokenKey, accessToken)
+    }
+
+    setRefreshToken(refreshToken: string) {
+        this.refreshToken = refreshToken
+        localStorage.setItem(this.lsRefreshTokenKey, refreshToken)
+    }
+
     getAccessToken() {
         if (this.accessToken) {
             return this.accessToken

@@ -7,6 +7,19 @@
 
 **Note:** While published as `@progalaxyelabs/ngx-stonescriptphp-client`, this is the official client for [StoneScriptPHP](https://stonescriptphp.org). Future versions will migrate to the `@stonescriptphp` namespace.
 
+## ✅ Authentication Support (v1.0.0+)
+
+**Fully compatible with StoneScriptPHP Framework v2.1.x authentication!**
+
+- ✅ **Cookie-based auth**: Secure httpOnly cookies + CSRF (StoneScriptPHP v2.1.x default)
+- ✅ **Body-based auth**: Legacy mode for custom backends
+- ✅ **Configurable**: Choose your auth strategy via environment config
+- ✅ **All HTTP methods**: GET, POST, PUT, PATCH, DELETE with automatic token refresh
+
+See [Configuration](#configuration) section below for setup details.
+
+📖 **Documentation**: [CHANGELOG](docs/CHANGELOG.md) | [Auth Compatibility](docs/AUTH_COMPATIBILITY.md)
+
 ---
 
 ## What is this?
@@ -104,6 +117,80 @@ PHP Backend (StoneScriptPHP)          Angular Frontend
 2. Run `php stone generate typescript-client`
 3. Import generated TypeScript interfaces in Angular
 4. Make type-safe HTTP calls
+
+## Configuration
+
+### Authentication Modes (v1.0.0+)
+
+Choose your authentication strategy based on your backend:
+
+#### Cookie-based Auth (Recommended - StoneScriptPHP v2.1.x)
+
+```typescript
+// environment.ts
+export const environment = {
+    production: false,
+    apiServer: {
+        host: 'http://localhost:8000/'
+    },
+    auth: {
+        mode: 'cookie',  // Default mode
+        refreshEndpoint: '/auth/refresh',  // Default endpoint
+        useCsrf: true,  // Default for cookie mode
+        refreshTokenCookieName: 'refresh_token',  // Default
+        csrfTokenCookieName: 'csrf_token',  // Default
+        csrfHeaderName: 'X-CSRF-Token'  // Default
+    }
+}
+```
+
+**Features:**
+- Secure httpOnly cookies prevent XSS attacks
+- CSRF token protection
+- Token rotation on refresh
+- Works with StoneScriptPHP `AuthRoutes::register($router)`
+
+#### Body-based Auth (Legacy/Custom Backends)
+
+```typescript
+// environment.ts
+export const environment = {
+    production: false,
+    apiServer: {
+        host: 'http://localhost:8000/'
+    },
+    auth: {
+        mode: 'body',
+        refreshEndpoint: '/user/refresh_access',
+        useCsrf: false
+    }
+}
+```
+
+**Use when:**
+- Your backend accepts tokens in request body
+- Custom authentication implementation
+- Migrating from older systems
+
+#### Manual Auth (No Auto-Refresh)
+
+```typescript
+// environment.ts
+export const environment = {
+    production: false,
+    apiServer: {
+        host: 'http://localhost:8000/'
+    },
+    auth: {
+        mode: 'none'
+    }
+}
+```
+
+**Use when:**
+- You handle token refresh manually
+- No authentication needed
+- Custom auth logic
 
 ## Advanced Usage
 

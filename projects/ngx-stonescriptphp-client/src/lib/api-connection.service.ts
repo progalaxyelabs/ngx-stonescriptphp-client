@@ -2,7 +2,8 @@ import { Injectable } from '@angular/core';
 import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
 import { ApiResponse } from './api-response.model';
-import { MyEnvironmentModel } from './my-environment.model';
+import { MyEnvironmentModel, AuthConfig } from './my-environment.model';
+import { CsrfService } from './csrf.service';
 
 @Injectable({
     providedIn: 'root'
@@ -13,12 +14,37 @@ export class ApiConnectionService {
 
     private accessToken = ''
 
+    private authConfig: AuthConfig
+
     constructor(
         private tokens: TokenService,
         private signinStatus: SigninStatusService,
-        private environment: MyEnvironmentModel
+        private environment: MyEnvironmentModel,
+        private csrf: CsrfService
     ) {
         this.host = environment.apiServer.host
+
+        // Set default auth config based on mode
+        this.authConfig = {
+            mode: environment.auth?.mode || 'cookie',
+            refreshEndpoint: environment.auth?.refreshEndpoint,
+            useCsrf: environment.auth?.useCsrf,
+            refreshTokenCookieName: environment.auth?.refreshTokenCookieName || 'refresh_token',
+            csrfTokenCookieName: environment.auth?.csrfTokenCookieName || 'csrf_token',
+            csrfHeaderName: environment.auth?.csrfHeaderName || 'X-CSRF-Token'
+        }
+
+        // Set default refresh endpoint based on mode if not specified
+        if (!this.authConfig.refreshEndpoint) {
+            this.authConfig.refreshEndpoint = this.authConfig.mode === 'cookie'
+                ? '/auth/refresh'
+                : '/user/refresh_access'
+        }
+
+        // Set default CSRF setting based on mode if not specified
+        if (this.authConfig.useCsrf === undefined) {
+            this.authConfig.useCsrf = this.authConfig.mode === 'cookie'
+        }
     }
 
 
@@ -84,7 +110,45 @@ export class ApiConnectionService {
             },
             body: JSON.stringify(data)
         }
-        return this.request(url, fetchOptions, data)        
+        return this.request(url, fetchOptions, data)
+    }
+
+    async put<DataType>(pathWithQueryParams: string, data: any): Promise<ApiResponse<DataType>> {
+        const url = this.host + pathWithQueryParams.replace(/^\/+/, '')
+        const fetchOptions: RequestInit = {
+            method: 'PUT',
+            mode: 'cors',
+            redirect: 'error',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        }
+        return this.request(url, fetchOptions, data)
+    }
+
+    async patch<DataType>(pathWithQueryParams: string, data: any): Promise<ApiResponse<DataType>> {
+        const url = this.host + pathWithQueryParams.replace(/^\/+/, '')
+        const fetchOptions: RequestInit = {
+            method: 'PATCH',
+            mode: 'cors',
+            redirect: 'error',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        }
+        return this.request(url, fetchOptions, data)
+    }
+
+    async delete<DataType>(endpoint: string, queryParamsObj?: any): Promise<ApiResponse<DataType>> {
+        const url = this.host + endpoint.replace(/^\/+/, '') + this.buildQueryString(queryParamsObj)
+        const fetchOptions: RequestInit = {
+            method: 'DELETE',
+            mode: 'cors',
+            redirect: 'error'
+        }
+        return this.request(url, fetchOptions, null)
     }
 
     // async postFormWithFiles(pathWithQueryParams: string, formData: FormData): Promise<ApiResponse | null> {
@@ -141,38 +205,127 @@ export class ApiConnectionService {
     }
 
     async refreshAccessToken(): Promise<boolean> {
-        const refreshToken = this.tokens.getRefreshToken()
-        if (!refreshToken) {
+        if (this.authConfig.mode === 'none') {
             return false
         }
 
-        const refreshTokenUrl = this.host + 'user/refresh_access'
-        let refreshTokenResponse = await fetch(refreshTokenUrl, {
-            method: 'POST',
-            mode: 'cors',
-            redirect: 'error',
-            headers: {
+        if (this.authConfig.mode === 'cookie') {
+            return await this.refreshAccessTokenCookieMode()
+        } else {
+            return await this.refreshAccessTokenBodyMode()
+        }
+    }
+
+    /**
+     * Refresh access token using cookie-based auth (StoneScriptPHP v2.1.x default)
+     */
+    private async refreshAccessTokenCookieMode(): Promise<boolean> {
+        try {
+            const refreshTokenUrl = this.host + this.authConfig.refreshEndpoint!.replace(/^\/+/, '')
+            const headers: any = {
                 'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                access_token: this.accessToken,
-                refresh_token: refreshToken
+            }
+
+            // Add CSRF token if enabled
+            if (this.authConfig.useCsrf) {
+                const csrfToken = this.csrf.getCsrfToken(this.authConfig.csrfTokenCookieName!)
+                if (!csrfToken) {
+                    console.error('CSRF token not found in cookie')
+                    return false
+                }
+                headers[this.authConfig.csrfHeaderName!] = csrfToken
+            }
+
+            let refreshTokenResponse = await fetch(refreshTokenUrl, {
+                method: 'POST',
+                mode: 'cors',
+                credentials: 'include', // Important: send cookies
+                redirect: 'error',
+                headers: headers
             })
-        })
-        if (!refreshTokenResponse.ok) {
+
+            if (!refreshTokenResponse.ok) {
+                this.accessToken = ''
+                this.tokens.clear()
+                return false
+            }
+
+            let refreshAccessData = await refreshTokenResponse.json()
+            if (!refreshAccessData || refreshAccessData.status !== 'ok') {
+                return false
+            }
+
+            // Extract access token from response
+            const newAccessToken = refreshAccessData.data?.access_token || refreshAccessData.access_token
+            if (!newAccessToken) {
+                console.error('No access token in refresh response')
+                return false
+            }
+
+            // Store new access token (refresh token is in httpOnly cookie)
+            this.tokens.setAccessToken(newAccessToken)
+            this.accessToken = newAccessToken
+
+            return true
+        } catch (error) {
+            console.error('Token refresh failed (cookie mode):', error)
             this.accessToken = ''
             this.tokens.clear()
             return false
         }
+    }
 
-        let refreshAccessData = await refreshTokenResponse.json()
-        if (!refreshAccessData) {
+    /**
+     * Refresh access token using body-based auth (legacy mode)
+     */
+    private async refreshAccessTokenBodyMode(): Promise<boolean> {
+        try {
+            const refreshToken = this.tokens.getRefreshToken()
+            if (!refreshToken) {
+                return false
+            }
+
+            const refreshTokenUrl = this.host + this.authConfig.refreshEndpoint!.replace(/^\/+/, '')
+            let refreshTokenResponse = await fetch(refreshTokenUrl, {
+                method: 'POST',
+                mode: 'cors',
+                redirect: 'error',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    access_token: this.accessToken,
+                    refresh_token: refreshToken
+                })
+            })
+
+            if (!refreshTokenResponse.ok) {
+                this.accessToken = ''
+                this.tokens.clear()
+                return false
+            }
+
+            let refreshAccessData = await refreshTokenResponse.json()
+            if (!refreshAccessData) {
+                return false
+            }
+
+            const newAccessToken = refreshAccessData.data?.access_token || refreshAccessData.access_token
+            if (!newAccessToken) {
+                console.error('No access token in refresh response')
+                return false
+            }
+
+            this.tokens.setTokens(newAccessToken, refreshToken)
+            this.accessToken = newAccessToken
+
+            return true
+        } catch (error) {
+            console.error('Token refresh failed (body mode):', error)
+            this.accessToken = ''
+            this.tokens.clear()
             return false
         }
-        this.tokens.setTokens(refreshAccessData.data.access_token, refreshToken)
-        this.accessToken = refreshAccessData.data.access_token
-
-        return true
     }
 
     buildQueryString(options?: any): string {
