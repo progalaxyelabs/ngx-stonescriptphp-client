@@ -40,7 +40,7 @@ This library provides the HTTP client that consumes those contracts, giving you 
 - ✅ **RxJS observables** - Native Angular integration
 - ✅ **Error handling** - Consistent error responses
 - ✅ **Interceptors ready** - Add auth, logging, retry logic
-- ✅ **Angular 19+** - Modern Angular standalone components
+- ✅ **Angular 19+ & 20+** - Modern Angular standalone components
 
 ## Installation
 
@@ -238,7 +238,7 @@ StoneScriptPHP responses follow this structure:
 
 ## Requirements
 
-- Angular >= 19.0.0
+- Angular >= 19.0.0 or 20.0.0
 - RxJS >= 7.8.0
 - TypeScript >= 5.8.0
 
