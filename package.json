@@ -23,13 +23,6 @@
     "email": "team@stonescriptphp.org",
     "url": "https://stonescriptphp.org"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "HLD.md",
-    "LICENSE",
-    "docs"
-  ],
   "scripts": {
     "build": "ng-packagr -p ng-package.json",
     "test": "echo \"No tests configured\"",
