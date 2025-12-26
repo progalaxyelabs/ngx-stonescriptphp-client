@@ -1,6 +1,6 @@
 {
   "name": "@progalaxyelabs/ngx-stonescriptphp-client",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Angular client library for StoneScriptPHP backend framework",
   "keywords": [
     "angular",
@@ -24,6 +24,7 @@
     "url": "https://stonescriptphp.org"
   },
   "files": [
+    "dist",
     "README.md",
     "HLD.md",
     "LICENSE",
@@ -31,9 +32,8 @@
   ],
   "scripts": {
     "build": "ng-packagr -p ng-package.json",
-    "prepublishOnly": "npm run build",
     "test": "echo \"No tests configured\"",
-    "publish:npm": "npm publish --access public"
+    "publish:npm": "npm run build && npm publish dist --access public"
   },
   "private": false,
   "peerDependencies": {
