@@ -1,6 +1,6 @@
 {
   "name": "@progalaxyelabs/ngx-stonescriptphp-client",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Angular client library for StoneScriptPHP backend framework",
   "keywords": [
     "angular",
@@ -23,25 +23,14 @@
     "email": "team@stonescriptphp.org",
     "url": "https://stonescriptphp.org"
   },
-  "main": "dist/index.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/esm/index.js",
-      "require": "./dist/index.js"
-    }
-  },
   "files": [
-    "dist",
     "README.md",
     "HLD.md",
     "LICENSE",
     "docs"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc && tsc -p tsconfig.esm.json",
+    "build": "ng-packagr -p ng-package.json",
     "prepublishOnly": "npm run build",
     "test": "echo \"No tests configured\"",
     "publish:npm": "npm publish --access public"
@@ -56,7 +45,10 @@
   },
   "devDependencies": {
     "@angular/common": "^20.0.0",
+    "@angular/compiler": "^20.0.0",
+    "@angular/compiler-cli": "^20.0.0",
     "@angular/core": "^20.0.0",
+    "ng-packagr": "^20.0.0",
     "typescript": "~5.8.0"
   },
   "publishConfig": {
