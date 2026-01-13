@@ -9,6 +9,8 @@
 
 ## ✅ Authentication Support (v1.0.0+)
 
+**Current Version: 1.1.2**
+
 **Fully compatible with StoneScriptPHP Framework v2.1.x authentication!**
 
 - ✅ **Cookie-based auth**: Secure httpOnly cookies + CSRF (StoneScriptPHP v2.1.x default)

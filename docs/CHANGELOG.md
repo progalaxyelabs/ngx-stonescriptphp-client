@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2025-12-26
+
+### Changed
+- **Repository organization**: Removed files array from package.json for cleaner npm publishing
+- **Minor improvements**: Build configuration refinements
+
+### Documentation
+- Updated package description and metadata
+- No API changes from v1.1.1
+
+---
+
+## [1.1.1] - 2025-12-20
+
+### Fixed
+- **Build improvements**: Enhanced build configuration for better compatibility
+- **Package metadata**: Updated dependencies and peer dependencies
+
+### Documentation
+- Minor documentation refinements
+- No breaking changes from v1.1.0
+
+---
+
+## [1.1.0] - 2025-12-18
+
+### Added
+- **Enhanced authentication flexibility**: Additional configuration options for auth modes
+- **Improved error handling**: Better error messages for authentication failures
+- **Type safety improvements**: Enhanced TypeScript definitions
+
+### Changed
+- **Build system updates**: Updated to Angular 20.0.0 for development
+- **Peer dependencies**: Now supports Angular ^19.0.0 || ^20.0.0
+
+### Documentation
+- Updated README with clearer authentication examples
+- Enhanced API documentation
+
+---
+
 ## [1.0.0] - 2025-12-14
 
 ### 🎉 Production Ready Release
