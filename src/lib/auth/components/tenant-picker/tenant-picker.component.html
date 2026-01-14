@@ -1,0 +1,86 @@
+<div class="tenant-picker-container">
+  <div class="tenant-picker-header">
+    <h2>Select Your Organization</h2>
+    <p class="subtitle">You have access to multiple organizations. Please select one to continue.</p>
+  </div>
+
+  <!-- Error Message -->
+  <div *ngIf="hasError" class="error-message">
+    <span class="error-icon">⚠</span>
+    <span class="error-text">{{ error?.message }}</span>
+    <button type="button" class="error-close" (click)="clearError()" aria-label="Close error">×</button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-overlay">
+    <div class="spinner"></div>
+    <p>Connecting to your organization...</p>
+  </div>
+
+  <!-- Tenant List -->
+  <div class="tenant-list" [class.disabled]="isLoading">
+    <button
+      *ngFor="let membership of sortedMemberships"
+      type="button"
+      class="tenant-item"
+      [class.selected]="isSelected(membership)"
+      [class.inactive]="membership.status !== 'active'"
+      [disabled]="isLoading || membership.status !== 'active'"
+      (click)="onSelectTenant(membership)"
+    >
+      <!-- Tenant Logo -->
+      <div class="tenant-logo">
+        <img
+          *ngIf="getTenantLogo(membership)"
+          [src]="getTenantLogo(membership)"
+          [alt]="getTenantName(membership) + ' logo'"
+          class="logo-image"
+        />
+        <div *ngIf="!getTenantLogo(membership)" class="logo-placeholder">
+          <span class="logo-initial">{{ getTenantName(membership).charAt(0).toUpperCase() }}</span>
+        </div>
+      </div>
+
+      <!-- Tenant Info -->
+      <div class="tenant-info">
+        <div class="tenant-name">{{ getTenantName(membership) }}</div>
+        <div class="tenant-meta">
+          <span [class]="getRoleBadgeClass(membership.role)">
+            {{ getRoleLabel(membership.role) }}
+          </span>
+          <span *ngIf="membership.status !== 'active'" class="status-badge status-{{ membership.status }}">
+            {{ membership.status }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Selection Indicator -->
+      <div class="selection-indicator" *ngIf="isSelected(membership)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/>
+        </svg>
+      </div>
+    </button>
+  </div>
+
+  <!-- Remember Choice -->
+  <div class="remember-choice-container">
+    <label class="checkbox-label">
+      <input
+        type="checkbox"
+        [(ngModel)]="rememberChoice"
+        [disabled]="isLoading"
+        (change)="toggleRememberChoice()"
+      />
+      <span class="checkbox-text">Remember my choice</span>
+    </label>
+    <p class="remember-hint">
+      We'll automatically select this organization next time you sign in.
+    </p>
+  </div>
+
+  <!-- No Tenants Message -->
+  <div *ngIf="memberships.length === 0 && !isLoading" class="no-tenants-message">
+    <p>No organizations available. Please contact support for assistance.</p>
+  </div>
+</div>
