@@ -42,6 +42,19 @@ export interface AuthConfig {
 
 export class MyEnvironmentModel {
     production: boolean = true
+
+    /**
+     * Platform code identifier (e.g., 'progalaxy', 'hr', 'admin')
+     * Used for multi-tenant authentication
+     */
+    platformCode: string = '';
+
+    /**
+     * Accounts platform URL for centralized authentication
+     * @example 'https://accounts.progalaxyelabs.com'
+     */
+    accountsUrl: string = '';
+
     firebase: {
         projectId: string
         appId: string

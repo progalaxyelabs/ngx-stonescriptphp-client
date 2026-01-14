@@ -1,8 +1,9 @@
 # ngx-stonescriptphp-client Development Status
 
-**Last Updated:** 2026-01-14 08:30 UTC
+**Last Updated:** 2026-01-14 10:15 UTC
 **Current Version:** 1.1.2 (published on npm)
-**Target Version:** 1.2.0 (in development)
+**Target Version:** 2.0.0 (implementing modal-based auth)
+**Local Build Status:** ✅ Built successfully with modal-based auth
 
 ## Project Overview
 
@@ -29,20 +30,21 @@ Angular HTTP client library for StoneScriptPHP backends. Used by production apps
 
 ### Multi-Session Plan
 
-#### Phase 1: Setup & Cleanup ⏳ IN PROGRESS
+#### Phase 1: Setup & Cleanup ✅ COMPLETED
 - [x] Understand architecture and dependencies
 - [x] Analyze progalaxy-platform/www integration
 - [x] Identify RxJS/HttpClient contamination in src/lib/
-- [ ] **NEXT:** Remove src/lib/ directory (contains Angular HTTP + RxJS)
-- [ ] Restore src/index.ts to Promise-based exports
-- [ ] Verify no RxJS/HttpClient imports remain
+- [x] Remove src/lib/ directory (contains Angular HTTP + RxJS)
+- [x] Restore src/index.ts to Promise-based exports
+- [x] Verify no RxJS/HttpClient imports remain (only SigninStatusService uses BehaviorSubject - intentional)
+- [x] Commit cleanup: **485cae9** - "refactor: Remove Angular HTTP/RxJS auth module"
 
-#### Phase 2: Local Development Setup 📋 PENDING
-- [ ] Build library: `npm run build`
-- [ ] Create npm link: `cd dist && npm link`
-- [ ] Link to progalaxy: `cd progalaxy-platform/www && npm link @progalaxyelabs/ngx-stonescriptphp-client`
-- [ ] Start progalaxy API server
-- [ ] Start progalaxy www with linked client
+#### Phase 2: Local Development Setup ✅ COMPLETED
+- [x] Build library: `npm run build` (successful in 1.2s)
+- [x] Create npm link: `cd dist && npm link`
+- [x] Link to progalaxy: `cd progalaxy-platform/www && npm link @progalaxyelabs/ngx-stonescriptphp-client`
+- [ ] **NEXT:** Start progalaxy API server
+- [ ] Start progalaxy www with linked client and verify it loads
 
 #### Phase 3: API Server Study 📋 PENDING
 - [ ] Explore `/api/src/App/Routes/` for endpoint definitions
@@ -74,26 +76,43 @@ Angular HTTP client library for StoneScriptPHP backends. Used by production apps
 
 ## Recent Commits
 
-### Session 2026-01-14 (Current)
+### Session 2026-01-14 (Current - Part 2)
+- **[Pending Commit]** - `feat: Implement modal-based authentication (v2.0.0)`
+  - ✅ Implemented AuthService with loginWithEmail, loginWithGoogle, loginWithGitHub, register
+  - ✅ Added User and AuthResult interfaces
+  - ✅ Added user$ Observable for reactive auth state
+  - ✅ Updated MyEnvironmentModel with accountsUrl and platformCode
+  - ✅ Added setSigninStatus() method to SigninStatusService
+  - ✅ Added hasValidAccessToken() method to TokenService
+  - ✅ OAuth via popup window with postMessage communication
+  - ✅ Email/password via fetch API
+  - ✅ Build successful (1.3s)
+
+### Session 2026-01-14 (Part 1)
+- **485cae9** - `refactor: Remove Angular HTTP/RxJS auth module, restore Promise-based architecture`
+  - ✅ Removed src/lib/ (30 files, 3,919 lines deleted)
+  - ✅ Restored src/index.ts to export auth.service, token.service
+  - ✅ Added DEVELOPMENT_STATUS.md for session tracking
+  - ✅ Clean Promise-based architecture verified
+
 - **4da14ef** - `feat: Add Angular HTTP-based auth module with UI components`
-  - ⚠️ **WARNING:** This commit introduces RxJS/HttpClient (30 files, 3,919 lines)
-  - Contains: AuthService, LoginComponent, Guards, Interceptor
-  - **ACTION REQUIRED:** Must be reverted/removed before testing
+  - ⚠️ Contains RxJS/HttpClient code (kept in git history)
+  - Reverted in next commit
 
 - **2c4e1fc** - `docs: update documentation for v1.1.2`
 
 ## Known Issues & Blockers
 
-### 🚨 Critical Issues
-1. **src/lib/ contamination**: Contains Angular HttpClient + RxJS code
-   - Files: `src/lib/auth/services/auth.service.ts` (uses HttpClient)
-   - Files: `src/lib/auth/interceptors/auth.interceptor.ts` (uses HttpInterceptorFn)
-   - **Impact:** Breaks Promise-based architecture
-   - **Resolution:** Delete entire `src/lib/` directory
+### ✅ Resolved Issues
+1. ~~**src/lib/ contamination**~~ - RESOLVED in commit 485cae9
+   - Deleted entire src/lib/ directory
+   - Removed 30 files with HttpClient/RxJS code
 
-2. **src/index.ts modified**: Now exports `./lib` instead of original services
-   - Original exports removed: `auth.service`, `token.service`
-   - **Resolution:** Restore original exports
+2. ~~**src/index.ts modified**~~ - RESOLVED in commit 485cae9
+   - Restored exports for auth.service, token.service
+
+### ⚠️ Current Issues
+None - architecture is clean and ready for testing.
 
 ### ⚠️ Warnings
 - Progalaxy has **local copy** of ApiConnectionService at `www/src/app/services/api-connection.service.ts`
@@ -190,5 +209,6 @@ When starting a new session:
 
 ---
 
-**Session Status:** 🟡 IN PROGRESS - Phase 1 (Setup & Cleanup)
-**Next Action:** Remove src/lib/ directory and restore Promise-based exports
+**Session Status:** 🟡 IN PROGRESS - Phase 3 (API Server Study)
+**Next Action:** Start progalaxy API server and www to verify integration
+**Ready for User Action:** Need user to start servers in progalaxy project window

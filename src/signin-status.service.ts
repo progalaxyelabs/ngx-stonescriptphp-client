@@ -18,4 +18,12 @@ export class SigninStatusService {
     signedIn(): void {
         this.status.next(true)
     }
+
+    /**
+     * Set signin status
+     * @param isSignedIn - True if user is signed in, false otherwise
+     */
+    setSigninStatus(isSignedIn: boolean): void {
+        this.status.next(isSignedIn)
+    }
 }

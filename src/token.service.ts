@@ -61,4 +61,13 @@ export class TokenService {
         localStorage.removeItem(this.lsAccessTokenKey)
         localStorage.removeItem(this.lsRefreshTokenKey)
     }
+
+    /**
+     * Check if there is a valid (non-empty) access token
+     * @returns True if access token exists and is not empty
+     */
+    hasValidAccessToken(): boolean {
+        const token = this.getAccessToken()
+        return token !== null && token !== ''
+    }
 }
