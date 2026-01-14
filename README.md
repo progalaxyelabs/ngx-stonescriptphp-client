@@ -7,20 +7,37 @@
 
 **Note:** While published as `@progalaxyelabs/ngx-stonescriptphp-client`, this is the official client for [StoneScriptPHP](https://stonescriptphp.org). Future versions will migrate to the `@stonescriptphp` namespace.
 
-## ✅ Authentication Support (v1.0.0+)
+## ✅ Authentication Support (v2.0.0)
 
-**Current Version: 1.1.2**
+**Current Version: 2.0.0 (Modal-Based Authentication)**
 
 **Fully compatible with StoneScriptPHP Framework v2.1.x authentication!**
 
+### HTTP Client Authentication
 - ✅ **Cookie-based auth**: Secure httpOnly cookies + CSRF (StoneScriptPHP v2.1.x default)
 - ✅ **Body-based auth**: Legacy mode for custom backends
 - ✅ **Configurable**: Choose your auth strategy via environment config
 - ✅ **All HTTP methods**: GET, POST, PUT, PATCH, DELETE with automatic token refresh
 
-See [Configuration](#configuration) section below for setup details.
+### Modal-Based User Authentication (NEW in v2.0.0)
+- ✅ **6 Auth Providers**: Google, LinkedIn, Apple, Microsoft, GitHub, Email/Password
+- ✅ **Declarative Configuration**: Enable/disable providers via environment
+- ✅ **Popup OAuth**: Social login via popup windows (no full-page redirects)
+- ✅ **Fetch API**: Promise-based authentication (minimal RxJS)
+- ✅ **Observable User State**: Reactive `user$` for UI updates
 
-📖 **Documentation**: [CHANGELOG](docs/CHANGELOG.md) | [Auth Compatibility](docs/AUTH_COMPATIBILITY.md)
+```typescript
+// Quick Example: Configure auth providers
+authProviders: {
+  google: { label: 'Sign in with Google', enabled: true },
+  linkedin: { label: 'Sign in with LinkedIn', enabled: true },
+  emailPassword: { label: 'Email', enabled: true }
+}
+```
+
+See [Configuration](#configuration) and [AUTH-PROVIDER-CONFIG.md](AUTH-PROVIDER-CONFIG.md) for details.
+
+📖 **Documentation**: [CHANGELOG](docs/CHANGELOG.md) | [Auth Compatibility](docs/AUTH_COMPATIBILITY.md) | [Provider Config](AUTH-PROVIDER-CONFIG.md) | [Modal Auth Spec](MODAL-AUTH-SPEC.md)
 
 ---
 

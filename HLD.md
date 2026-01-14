@@ -1,13 +1,13 @@
 # ngx-stonescriptphp-client - High Level Design
 
-**Version**: 1.1.2
-**Last Updated**: 2025-12-26
+**Version**: 2.0.0
+**Last Updated**: 2026-01-14
 
 ## Overview
-Official Angular HTTP client library for StoneScriptPHP backend framework.
+Official Angular HTTP client library for StoneScriptPHP backend framework with built-in authentication UI components.
 
 ## Purpose
-Provides type-safe HTTP calls to StoneScriptPHP APIs using auto-generated TypeScript interfaces with full authentication support.
+Provides type-safe HTTP calls to StoneScriptPHP APIs using auto-generated TypeScript interfaces with full authentication support and ready-to-use login/registration components.
 
 ## Architecture
 
@@ -36,9 +36,39 @@ Provides type-safe HTTP calls to StoneScriptPHP APIs using auto-generated TypeSc
 - Observable-based signin status tracking
 - Session lifecycle management
 
+#### AuthService (NEW in v2.0.0)
+- Multi-provider OAuth authentication (Google, LinkedIn, Apple, Microsoft, GitHub)
+- Email/password authentication
+- Session management with token refresh
+- User state Observable (`user$`)
+- Popup-based OAuth flow with postMessage communication
+
 #### DbService
 - Placeholder for future IndexedDB integration
 - Reserved for offline storage capabilities
+
+### UI Components (NEW in v2.0.0)
+
+The library provides standalone Angular components for authentication:
+
+#### LoginDialogComponent
+- **Purpose**: Pre-built login UI with dynamic provider rendering
+- **Features**:
+  - Email/password login form
+  - OAuth provider buttons (Google, LinkedIn, Apple, Microsoft, GitHub)
+  - Loading states and error handling
+  - Configurable providers via input property
+- **Usage**: Import and open in Material Dialog or any modal system
+
+#### RegisterComponent
+- **Purpose**: User registration form
+- **Features**:
+  - Full name, email, password, confirm password fields
+  - Client-side validation
+  - Success/error messaging
+- **Usage**: Standalone component for registration flows
+
+**Key Design Decision**: Providers are configured when opening the dialog (not in environment), allowing different dialogs to show different authentication options.
 
 ### Authentication Architecture
 
@@ -64,6 +94,7 @@ The library supports three authentication modes configurable via environment set
 
 ### Data Flow
 
+#### API Request Flow
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Angular Application                      │
@@ -92,6 +123,45 @@ The library supports three authentication modes configurable via environment set
 └─────────────────────────────────────────────────────────────┘
 ```
 
+#### Modal Authentication Flow (v2.0.0)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  Platform Application                        │
+│                                                              │
+│  ┌────────────────────────────────────────┐                │
+│  │  MatDialog.open(LoginDialogComponent)  │                │
+│  │  providers = ['google', 'emailPassword']│                │
+│  └────────────┬───────────────────────────┘                │
+│               │                                              │
+│       ┌───────▼──────────┐                                  │
+│       │ LoginDialog      │                                  │
+│       │ (from library)   │                                  │
+│       │ - Email form     │                                  │
+│       │ - OAuth buttons  │                                  │
+│       └───────┬──────────┘                                  │
+│               │                                              │
+│       ┌───────▼──────────┐                                  │
+│       │   AuthService    │                                  │
+│       │ - loginWithEmail()│                                 │
+│       │ - loginWithGoogle()│                                │
+│       └───────┬──────────┘                                  │
+└───────────────┼──────────────────────────────────────────────┘
+                │
+       ┌────────▼─────────┐
+       │  OAuth Popup     │ (for OAuth providers)
+       │  postMessage     │
+       └────────┬─────────┘
+                │
+                ▼
+┌─────────────────────────────────────────────────────────────┐
+│           Accounts Platform API                              │
+│  - /api/auth/login (email/password)                         │
+│  - /oauth/google (OAuth providers)                          │
+│  - /api/auth/register                                       │
+│  - /api/auth/refresh                                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ### Type Safety Flow
 
 1. **Backend**: Developer defines PHP DTOs and contracts in StoneScriptPHP
@@ -103,14 +173,16 @@ The library supports three authentication modes configurable via environment set
 ## Tech Stack
 
 ### Dependencies
-- **Angular**: >= 19.0.0 or 20.0.0
-- **RxJS**: >= 7.8.0
+- **Angular Common**: >= 19.0.0 or 20.0.0
+- **Angular Core**: >= 19.0.0 or 20.0.0
+- **Angular Forms**: >= 19.0.0 or 20.0.0 (NEW in v2.0.0)
 - **TypeScript**: >= 5.8.0
 - **tslib**: ^2.8.0
 
 ### Build Tools
 - **ng-packagr**: ^20.0.0 (Angular package builder)
 - **TypeScript Compiler**: ~5.8.0
+- **Strict Templates**: Enabled for enhanced template type checking
 
 ## API Response Model
 
@@ -144,6 +216,8 @@ Developers configure the client via the environment file:
 ```typescript
 interface MyEnvironmentModel {
   production: boolean;
+  platformCode: string;           // NEW in v2.0.0 - for multi-tenant auth
+  accountsUrl: string;            // NEW in v2.0.0 - centralized auth platform
   apiServer: {
     host: string;
   };
@@ -158,6 +232,8 @@ interface MyEnvironmentModel {
 }
 ```
 
+**Note**: Authentication providers are NOT configured in environment. They are specified when opening the login dialog.
+
 ## Distribution
 
 - **Package Name**: `@progalaxyelabs/ngx-stonescriptphp-client`
@@ -167,7 +243,16 @@ interface MyEnvironmentModel {
 
 ## Version History
 
-- **v1.1.2** (Current): Repository organization improvements
+- **v2.0.0** (Current): Modal-based authentication with UI components
+  - Added `LoginDialogComponent` with dynamic provider rendering
+  - Added `RegisterComponent` for user registration
+  - Added `AuthService` with multi-provider OAuth support (Google, LinkedIn, Apple, Microsoft, GitHub)
+  - Added centralized accounts platform integration
+  - Provider configuration via dialog input (not environment)
+  - Angular 20 control flow syntax (`@if`, `@for`)
+  - Strict template type checking enabled
+  - Added `@angular/forms` peer dependency
+- **v1.1.2**: Repository organization improvements
 - **v1.1.1**: Build configuration enhancements
 - **v1.1.0**: Enhanced authentication flexibility, Angular 20 support
 - **v1.0.0**: First production release, full StoneScriptPHP v2.1.x compatibility
@@ -180,6 +265,8 @@ interface MyEnvironmentModel {
 1. **DbService**: Not yet implemented - placeholder for future offline storage
 2. **WebSocket Support**: Not yet available - planned for future versions
 3. **File Upload**: Basic support via FormData, enhanced features planned
+4. **UI Customization**: Components have inline styles; CSS customization limited to class overrides
+5. **Dialog Dependency**: LoginDialogComponent works best with Material Dialog but is framework-agnostic
 
 ## Roadmap
 
@@ -190,6 +277,9 @@ interface MyEnvironmentModel {
 - Comprehensive unit test coverage
 - RxJS operators for common API patterns
 - Demo application and examples
+- Themeable UI components (Material Design integration)
+- Password reset/forgot password flows
+- Email verification components
 - Migration to `@stonescriptphp` namespace
 
 ## Security Considerations
@@ -199,6 +289,12 @@ interface MyEnvironmentModel {
 3. **Token Storage**: Avoid localStorage for sensitive tokens in production
 4. **HTTPS**: Always use HTTPS in production environments
 5. **Token Rotation**: Refresh tokens are rotated on each refresh request
+6. **OAuth Security** (NEW in v2.0.0):
+   - Popup-based flow prevents redirect vulnerabilities
+   - Origin verification via postMessage
+   - No client-side OAuth secrets (handled by accounts platform)
+   - Short-lived access tokens with automatic refresh
+7. **Input Validation**: Client-side validation in RegisterComponent (server-side validation still required)
 
 ## Support & Contributing
 

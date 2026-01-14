@@ -1,11 +1,20 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 
+/**
+ * @deprecated Use boolean directly. Kept for backward compatibility.
+ */
+export enum VerifyStatus {
+    initialized = 'initialized',
+    yes = 'yes',
+    no = 'no'
+}
+
 @Injectable({
     providedIn: 'root'
 })
 export class SigninStatusService {
-    public status: BehaviorSubject<boolean>
+    public status: BehaviorSubject<boolean | VerifyStatus>
 
     constructor() {
         this.status = new BehaviorSubject<boolean>(false)

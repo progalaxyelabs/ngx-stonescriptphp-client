@@ -4,6 +4,8 @@ import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
 import { MyEnvironmentModel } from './my-environment.model';
 
+export type AuthProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'emailPassword';
+
 export interface User {
     user_id: number;
     email: string;
@@ -85,6 +87,38 @@ export class AuthService {
      */
     async loginWithGitHub(): Promise<AuthResult> {
         return this.loginWithOAuth('github');
+    }
+
+    /**
+     * Login with LinkedIn OAuth (popup window)
+     */
+    async loginWithLinkedIn(): Promise<AuthResult> {
+        return this.loginWithOAuth('linkedin');
+    }
+
+    /**
+     * Login with Apple OAuth (popup window)
+     */
+    async loginWithApple(): Promise<AuthResult> {
+        return this.loginWithOAuth('apple');
+    }
+
+    /**
+     * Login with Microsoft OAuth (popup window)
+     */
+    async loginWithMicrosoft(): Promise<AuthResult> {
+        return this.loginWithOAuth('microsoft');
+    }
+
+    /**
+     * Generic provider-based login (supports all OAuth providers)
+     * @param provider - The provider identifier
+     */
+    async loginWithProvider(provider: AuthProvider): Promise<AuthResult> {
+        if (provider === 'emailPassword') {
+            throw new Error('Use loginWithEmail() for email/password authentication');
+        }
+        return this.loginWithOAuth(provider);
     }
 
     /**
@@ -285,5 +319,102 @@ export class AuthService {
      */
     getCurrentUser(): User | null {
         return this.userSubject.value;
+    }
+
+    // ===== Backward Compatibility Methods =====
+    // These methods are deprecated and maintained for backward compatibility
+    // with existing platform code. New code should use the methods above.
+
+    /**
+     * @deprecated Use getCurrentUser()?.user_id instead
+     */
+    getUserId(): number {
+        return this.userSubject.value?.user_id || 0;
+    }
+
+    /**
+     * @deprecated Use getCurrentUser()?.display_name instead
+     */
+    getUserName(): string {
+        return this.userSubject.value?.display_name || '';
+    }
+
+    /**
+     * @deprecated Use getCurrentUser()?.photo_url instead
+     */
+    getPhotoUrl(): string {
+        return this.userSubject.value?.photo_url || '';
+    }
+
+    /**
+     * @deprecated Use getCurrentUser()?.display_name instead
+     */
+    getDisplayName(): string {
+        return this.userSubject.value?.display_name || '';
+    }
+
+    /**
+     * @deprecated Use `/profile/${getCurrentUser()?.user_id}` instead
+     */
+    getProfileUrl(): string {
+        const userId = this.userSubject.value?.user_id;
+        return userId ? `/profile/${userId}` : '';
+    }
+
+    /**
+     * @deprecated Use isAuthenticated() instead
+     */
+    async signin(): Promise<boolean> {
+        return this.isAuthenticated();
+    }
+
+    /**
+     * @deprecated Use loginWithEmail() instead
+     */
+    async verifyCredentials(email: string, password: string): Promise<boolean> {
+        const result = await this.loginWithEmail(email, password);
+        return result.success;
+    }
+
+    /**
+     * @deprecated Check user.is_email_verified from getCurrentUser() instead
+     */
+    isSigninEmailValid(): boolean {
+        return this.userSubject.value?.is_email_verified || false;
+    }
+
+    /**
+     * @deprecated No longer needed - dialog is managed by platform
+     */
+    onDialogClose(): void {
+        // No-op for backward compatibility
+    }
+
+    /**
+     * @deprecated No longer needed - dialog is managed by platform
+     */
+    closeSocialAuthDialog(): void {
+        // No-op for backward compatibility
+    }
+
+    /**
+     * @deprecated Check if user exists by calling /api/auth/check-email endpoint
+     */
+    async getUserProfile(email: string): Promise<User | null> {
+        try {
+            const response = await fetch(
+                `${this.environment.accountsUrl}/api/auth/check-email`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                }
+            );
+
+            const data = await response.json();
+            return data.exists ? data.user : null;
+        } catch (error) {
+            return null;
+        }
     }
 }

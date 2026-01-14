@@ -346,4 +346,36 @@ export class ApiConnectionService {
 
         return ''
     }
+
+    /**
+     * Upload a drawing (uses upload server if configured, otherwise API server)
+     * @deprecated Platform-specific method - consider moving to platform service
+     */
+    async uploadDrawing<DataType>(formData: FormData): Promise<ApiResponse<DataType>> {
+        const uploadHost = (this.environment as any).uploadServer?.host || this.host
+        const url = uploadHost + 'upload/drawing'
+        const fetchOptions: RequestInit = {
+            method: 'POST',
+            mode: 'cors',
+            redirect: 'error',
+            body: formData
+        }
+        return this.request(url, fetchOptions, null)
+    }
+
+    /**
+     * Upload an image (uses upload server if configured, otherwise API server)
+     * @deprecated Platform-specific method - consider moving to platform service
+     */
+    async uploadImage<DataType>(formData: FormData): Promise<ApiResponse<DataType>> {
+        const uploadHost = (this.environment as any).uploadServer?.host || this.host
+        const url = uploadHost + 'upload/image'
+        const fetchOptions: RequestInit = {
+            method: 'POST',
+            mode: 'cors',
+            redirect: 'error',
+            body: formData
+        }
+        return this.request(url, fetchOptions, null)
+    }
 }
