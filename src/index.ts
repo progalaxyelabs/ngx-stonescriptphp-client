@@ -18,3 +18,4 @@ export * from './lib/components/register.component';
 
 // Re-export types for convenience
 export type { AuthProvider, User, AuthResult } from './auth.service';
+export { VerifyStatus } from './signin-status.service';

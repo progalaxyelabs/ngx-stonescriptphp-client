@@ -1,0 +1,18 @@
+{
+  "name": "ngx-stonescriptphp-client-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for ngx-stonescriptphp-client using Playwright",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report"
+  },
+  "keywords": ["playwright", "e2e", "testing"],
+  "author": "StoneScriptPHP Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

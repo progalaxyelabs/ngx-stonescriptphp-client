@@ -1,13 +1,35 @@
 # Testing Guide - ngx-stonescriptphp-client v2.0.0
 
-## Testing Options
+## Automated Test Setup (Recommended)
 
-You have several ways to test the modal authentication components:
+**The fastest way to test is using our automated test environment:**
 
-### Option 1: Quick Test in Existing Platform (Recommended)
+```bash
+# One-time setup
+./tests/setup-test.sh
+
+# Run tests
+./tests/run-test.sh
+```
+
+See [tests/QUICK-START.md](tests/QUICK-START.md) for 3-step guide or [tests/README.md](tests/README.md) for detailed documentation.
+
+This includes:
+- Mock accounts server with hardcoded test credentials
+- Pre-configured Angular test app
+- All authentication flows ready to test
+- No external dependencies needed
+
+---
+
+## Manual Testing Options
+
+If you prefer manual setup, you have several options:
+
+### Option 1: Test in Existing Platform
 Test directly in an existing platform (like progalaxy.in) that already uses this library.
 
-### Option 2: Create Minimal Test App
+### Option 2: Create Custom Test App
 Set up a minimal Angular app specifically for testing.
 
 ### Option 3: Unit Tests

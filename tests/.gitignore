@@ -1,0 +1,7 @@
+# Ignore generated test app
+angular-test-app/
+
+# Keep the scripts and docs
+!mock-accounts-server/
+!*.sh
+!*.md
