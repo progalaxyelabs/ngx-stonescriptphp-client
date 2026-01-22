@@ -321,6 +321,275 @@ export class AuthService {
         return this.userSubject.value;
     }
 
+    // ===== Multi-Tenant Methods =====
+
+    /**
+     * Register a new user AND create a new tenant (organization)
+     * This is used when a user wants to create their own organization
+     */
+    async registerTenant(data: {
+        tenantName: string;
+        tenantSlug: string;
+        displayName?: string;
+        email?: string;
+        password?: string;
+        provider: AuthProvider;
+    }): Promise<{
+        success: boolean;
+        message?: string;
+        tenant?: { id: string; name: string; slug: string };
+        user?: { id: string; email: string; name: string };
+        access_token?: string;
+    }> {
+        try {
+            // If using OAuth, initiate OAuth flow first
+            if (data.provider !== 'emailPassword') {
+                return await this.registerTenantWithOAuth(
+                    data.tenantName,
+                    data.tenantSlug,
+                    data.provider
+                );
+            }
+
+            // Email/password registration
+            const response = await fetch(
+                `${this.environment.accountsUrl}/api/auth/register-tenant`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        platform: this.environment.platformCode,
+                        tenant_name: data.tenantName,
+                        tenant_slug: data.tenantSlug,
+                        display_name: data.displayName,
+                        email: data.email,
+                        password: data.password,
+                        provider: 'emailPassword'
+                    })
+                }
+            );
+
+            const result = await response.json();
+
+            if (result.success && result.access_token) {
+                this.tokens.setAccessToken(result.access_token);
+                this.signinStatus.setSigninStatus(true);
+                if (result.user) {
+                    this.userSubject.next(result.user);
+                }
+            }
+
+            return result;
+        } catch (error) {
+            return {
+                success: false,
+                message: 'Network error. Please try again.'
+            };
+        }
+    }
+
+    /**
+     * Register tenant with OAuth provider
+     * Opens popup window for OAuth flow
+     */
+    private async registerTenantWithOAuth(
+        tenantName: string,
+        tenantSlug: string,
+        provider: AuthProvider
+    ): Promise<{
+        success: boolean;
+        message?: string;
+        tenant?: { id: string; name: string; slug: string };
+        user?: { id: string; email: string; name: string };
+    }> {
+        return new Promise((resolve) => {
+            const width = 500;
+            const height = 600;
+            const left = (window.screen.width - width) / 2;
+            const top = (window.screen.height - height) / 2;
+
+            // Build OAuth URL with tenant registration params
+            const oauthUrl = `${this.environment.accountsUrl}/oauth/${provider}?` +
+                `platform=${this.environment.platformCode}&` +
+                `mode=popup&` +
+                `action=register_tenant&` +
+                `tenant_name=${encodeURIComponent(tenantName)}&` +
+                `tenant_slug=${encodeURIComponent(tenantSlug)}`;
+
+            const popup = window.open(
+                oauthUrl,
+                `${provider}_register_tenant`,
+                `width=${width},height=${height},left=${left},top=${top}`
+            );
+
+            if (!popup) {
+                resolve({
+                    success: false,
+                    message: 'Popup blocked. Please allow popups for this site.'
+                });
+                return;
+            }
+
+            // Listen for message from popup
+            const messageHandler = (event: MessageEvent) => {
+                // Verify origin
+                if (event.origin !== new URL(this.environment.accountsUrl).origin) {
+                    return;
+                }
+
+                if (event.data.type === 'tenant_register_success') {
+                    // Set tokens and user
+                    if (event.data.access_token) {
+                        this.tokens.setAccessToken(event.data.access_token);
+                        this.signinStatus.setSigninStatus(true);
+                    }
+                    if (event.data.user) {
+                        this.userSubject.next(event.data.user);
+                    }
+
+                    window.removeEventListener('message', messageHandler);
+                    popup.close();
+
+                    resolve({
+                        success: true,
+                        tenant: event.data.tenant,
+                        user: event.data.user
+                    });
+                } else if (event.data.type === 'tenant_register_error') {
+                    window.removeEventListener('message', messageHandler);
+                    popup.close();
+
+                    resolve({
+                        success: false,
+                        message: event.data.message || 'Tenant registration failed'
+                    });
+                }
+            };
+
+            window.addEventListener('message', messageHandler);
+
+            // Check if popup was closed manually
+            const checkClosed = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(checkClosed);
+                    window.removeEventListener('message', messageHandler);
+                    resolve({
+                        success: false,
+                        message: 'Registration cancelled'
+                    });
+                }
+            }, 500);
+        });
+    }
+
+    /**
+     * Get all tenant memberships for the authenticated user
+     */
+    async getTenantMemberships(): Promise<{
+        memberships: Array<{
+            tenant_id: string;
+            slug: string;
+            name: string;
+            role: string;
+            status: string;
+            last_accessed?: string;
+        }>;
+    }> {
+        try {
+            const response = await fetch(
+                `${this.environment.accountsUrl}/api/auth/memberships`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${this.tokens.getAccessToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'
+                }
+            );
+
+            const data = await response.json();
+            return {
+                memberships: data.memberships || []
+            };
+        } catch (error) {
+            return { memberships: [] };
+        }
+    }
+
+    /**
+     * Select a tenant for the current session
+     * Updates the JWT token with tenant context
+     */
+    async selectTenant(tenantId: string): Promise<{
+        success: boolean;
+        message?: string;
+        access_token?: string;
+    }> {
+        try {
+            const response = await fetch(
+                `${this.environment.accountsUrl}/api/auth/select-tenant`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.tokens.getAccessToken()}`,
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ tenant_id: tenantId })
+                }
+            );
+
+            const data = await response.json();
+
+            if (data.success && data.access_token) {
+                this.tokens.setAccessToken(data.access_token);
+                return {
+                    success: true,
+                    access_token: data.access_token
+                };
+            }
+
+            return {
+                success: false,
+                message: data.message || 'Failed to select tenant'
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: 'Network error. Please try again.'
+            };
+        }
+    }
+
+    /**
+     * Check if a tenant slug is available
+     */
+    async checkTenantSlugAvailable(slug: string): Promise<{
+        available: boolean;
+        suggestion?: string;
+    }> {
+        try {
+            const response = await fetch(
+                `${this.environment.accountsUrl}/api/auth/check-tenant-slug/${slug}`,
+                {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                }
+            );
+
+            const data = await response.json();
+            return {
+                available: data.available || false,
+                suggestion: data.suggestion
+            };
+        } catch (error) {
+            // On error, assume available (don't block registration)
+            return { available: true };
+        }
+    }
+
     // ===== Backward Compatibility Methods =====
     // These methods are deprecated and maintained for backward compatibility
     // with existing platform code. New code should use the methods above.
