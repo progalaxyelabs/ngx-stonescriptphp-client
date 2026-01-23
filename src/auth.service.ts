@@ -24,6 +24,8 @@ export interface AuthResult {
     providedIn: 'root'
 })
 export class AuthService {
+    private readonly USER_STORAGE_KEY = 'progalaxyapi_user';
+
     // Observable user state
     private userSubject = new BehaviorSubject<User | null>(null);
     public user$: Observable<User | null> = this.userSubject.asObservable();
@@ -32,7 +34,48 @@ export class AuthService {
         private tokens: TokenService,
         private signinStatus: SigninStatusService,
         @Inject(MyEnvironmentModel) private environment: MyEnvironmentModel
-    ) { }
+    ) {
+        // Restore user from localStorage on initialization
+        this.restoreUser();
+    }
+
+    /**
+     * Restore user from localStorage
+     */
+    private restoreUser(): void {
+        try {
+            const userJson = localStorage.getItem(this.USER_STORAGE_KEY);
+            if (userJson) {
+                const user = JSON.parse(userJson);
+                this.updateUser(user);
+            }
+        } catch (error) {
+            console.error('Failed to restore user from localStorage:', error);
+        }
+    }
+
+    /**
+     * Save user to localStorage
+     */
+    private saveUser(user: User | null): void {
+        try {
+            if (user) {
+                localStorage.setItem(this.USER_STORAGE_KEY, JSON.stringify(user));
+            } else {
+                localStorage.removeItem(this.USER_STORAGE_KEY);
+            }
+        } catch (error) {
+            console.error('Failed to save user to localStorage:', error);
+        }
+    }
+
+    /**
+     * Update user subject and persist to localStorage
+     */
+    private updateUser(user: User | null): void {
+        this.updateUser(user);
+        this.saveUser(user);
+    }
 
     /**
      * Login with email and password
@@ -58,7 +101,7 @@ export class AuthService {
             if (data.success && data.access_token) {
                 this.tokens.setAccessToken(data.access_token);
                 this.signinStatus.setSigninStatus(true);
-                this.userSubject.next(data.user);
+                this.updateUser(data.user);
 
                 return { success: true, user: data.user };
             }
@@ -160,7 +203,7 @@ export class AuthService {
                 if (event.data.type === 'oauth_success') {
                     this.tokens.setAccessToken(event.data.access_token);
                     this.signinStatus.setSigninStatus(true);
-                    this.userSubject.next(event.data.user);
+                    this.updateUser(event.data.user);
 
                     window.removeEventListener('message', messageHandler);
                     popup.close();
@@ -225,7 +268,7 @@ export class AuthService {
             if (data.success && data.access_token) {
                 this.tokens.setAccessToken(data.access_token);
                 this.signinStatus.setSigninStatus(true);
-                this.userSubject.next(data.user);
+                this.updateUser(data.user);
 
                 return {
                     success: true,
@@ -251,19 +294,28 @@ export class AuthService {
      */
     async signout(): Promise<void> {
         try {
-            await fetch(
-                `${this.environment.accountsUrl}/api/auth/logout`,
-                {
-                    method: 'POST',
-                    credentials: 'include'
-                }
-            );
+            const refreshToken = this.tokens.getRefreshToken();
+            if (refreshToken) {
+                await fetch(
+                    `${this.environment.accountsUrl}/api/auth/logout`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            refresh_token: refreshToken
+                        })
+                    }
+                );
+            }
         } catch (error) {
             console.error('Logout API call failed:', error);
         } finally {
             this.tokens.clear();
             this.signinStatus.setSigninStatus(false);
-            this.userSubject.next(null);
+            this.updateUser(null);
         }
     }
 
@@ -295,7 +347,7 @@ export class AuthService {
 
             if (data.access_token) {
                 this.tokens.setAccessToken(data.access_token);
-                this.userSubject.next(data.user);
+                this.updateUser(data.user);
                 this.signinStatus.setSigninStatus(true);
                 return true;
             }
@@ -376,7 +428,7 @@ export class AuthService {
                 this.tokens.setAccessToken(result.access_token);
                 this.signinStatus.setSigninStatus(true);
                 if (result.user) {
-                    this.userSubject.next(result.user);
+                    this.updateUser(result.user);
                 }
             }
 
@@ -445,7 +497,7 @@ export class AuthService {
                         this.signinStatus.setSigninStatus(true);
                     }
                     if (event.data.user) {
-                        this.userSubject.next(event.data.user);
+                        this.updateUser(event.data.user);
                     }
 
                     window.removeEventListener('message', messageHandler);
@@ -684,6 +736,91 @@ export class AuthService {
             return data.exists ? data.user : null;
         } catch (error) {
             return null;
+        }
+    }
+
+    /**
+     * Check if user has completed onboarding (has a tenant)
+     */
+    async checkOnboardingStatus(identityId: string): Promise<{
+        onboarded: boolean;
+        tenant_slug?: string;
+        tenant_name?: string;
+        role?: string;
+    }> {
+        try {
+            const response = await fetch(
+                `${this.environment.accountsUrl}/api/auth/onboarding/status?platform_code=${this.environment.platformCode}&identity_id=${identityId}`,
+                {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include'
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error('Failed to check onboarding status');
+            }
+
+            return await response.json();
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    /**
+     * Complete tenant onboarding (create tenant with country + org name)
+     */
+    async completeTenantOnboarding(countryCode: string, tenantName: string): Promise<{
+        tenant: {
+            id: string;
+            slug: string;
+            name: string;
+        };
+        access_token: string;
+        refresh_token: string;
+    }> {
+        try {
+            const accessToken = this.tokens.getAccessToken();
+            if (!accessToken) {
+                throw new Error('Not authenticated');
+            }
+
+            const response = await fetch(
+                `${this.environment.accountsUrl}/api/auth/register-tenant`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        platform: this.environment.platformCode,
+                        tenant_name: tenantName,
+                        country_code: countryCode,
+                        provider: 'google', // Assuming OAuth
+                        oauth_token: accessToken
+                    })
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to create tenant');
+            }
+
+            const data = await response.json();
+
+            // Update tokens with new tenant-scoped tokens
+            if (data.access_token) {
+                this.tokens.setAccessToken(data.access_token);
+                this.signinStatus.setSigninStatus(true);
+            }
+
+            return data;
+        } catch (error) {
+            throw error;
         }
     }
 }
