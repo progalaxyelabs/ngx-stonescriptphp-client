@@ -527,6 +527,7 @@ export class TenantLoginComponent implements OnInit {
     @Input() providers: AuthProvider[] = ['google'];
     @Input() showTenantSelector: boolean = true;
     @Input() autoSelectSingleTenant: boolean = true;
+    @Input() prefillEmail?: string;  // Email to prefill (for account linking flow)
     @Input() allowTenantCreation: boolean = true;
 
     // Tenant Selector Labels
@@ -574,6 +575,12 @@ export class TenantLoginComponent implements OnInit {
         // If only emailPassword is available, use it by default
         if (this.oauthProviders.length === 0 && this.isProviderEnabled('emailPassword')) {
             this.useOAuth = false;
+        }
+
+        // Prefill email if provided (for account linking flow)
+        if (this.prefillEmail) {
+            this.email = this.prefillEmail;
+            this.useOAuth = false;  // Switch to email/password form
         }
     }
 
