@@ -133,30 +133,44 @@ export interface TenantCreatedEvent {
                             class="form-control">
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group password-group">
                         <label for="password">Password *</label>
                         <input
                             id="password"
                             [(ngModel)]="password"
                             name="password"
                             placeholder="Create a password"
-                            type="password"
+                            [type]="showPassword ? 'text' : 'password'"
                             required
                             minlength="8"
-                            class="form-control">
+                            class="form-control password-input">
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            (click)="showPassword = !showPassword"
+                            [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'">
+                            {{ showPassword ? '👁️' : '👁️‍🗨️' }}
+                        </button>
                         <small class="form-hint">At least 8 characters</small>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group password-group">
                         <label for="confirmPassword">Confirm Password *</label>
                         <input
                             id="confirmPassword"
                             [(ngModel)]="confirmPassword"
                             name="confirmPassword"
                             placeholder="Confirm your password"
-                            type="password"
+                            [type]="showConfirmPassword ? 'text' : 'password'"
                             required
-                            class="form-control">
+                            class="form-control password-input">
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            (click)="showConfirmPassword = !showConfirmPassword"
+                            [attr.aria-label]="showConfirmPassword ? 'Hide password' : 'Show password'">
+                            {{ showConfirmPassword ? '👁️' : '👁️‍🗨️' }}
+                        </button>
                     </div>
 
                     <button
@@ -270,6 +284,10 @@ export interface TenantCreatedEvent {
             margin-bottom: 16px;
         }
 
+        .password-group {
+            position: relative;
+        }
+
         .form-group label {
             display: block;
             margin-bottom: 6px;
@@ -286,6 +304,34 @@ export interface TenantCreatedEvent {
             font-size: 14px;
             box-sizing: border-box;
             transition: border-color 0.2s;
+        }
+
+        .password-input {
+            padding-right: 45px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 8px;
+            top: 38px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 8px;
+            line-height: 1;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .password-toggle:hover {
+            opacity: 1;
+        }
+
+        .password-toggle:focus {
+            outline: 2px solid #4285f4;
+            outline-offset: 2px;
+            border-radius: 4px;
         }
 
         .form-control:focus {
@@ -539,6 +585,8 @@ export class TenantRegisterComponent implements OnInit {
     slugError = '';
     useEmailPassword = false;
     oauthProviders: AuthProvider[] = [];
+    showPassword = false;
+    showConfirmPassword = false;
 
     constructor(private auth: AuthService) {}
 

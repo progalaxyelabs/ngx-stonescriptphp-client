@@ -40,14 +40,21 @@ export interface TenantSelectedEvent {
                                 required
                                 class="form-control">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group password-group">
                             <input
                                 [(ngModel)]="password"
                                 name="password"
                                 placeholder="Password"
-                                type="password"
+                                [type]="showPassword ? 'text' : 'password'"
                                 required
-                                class="form-control">
+                                class="form-control password-input">
+                            <button
+                                type="button"
+                                class="password-toggle"
+                                (click)="showPassword = !showPassword"
+                                [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'">
+                                {{ showPassword ? '👁️' : '👁️‍🗨️' }}
+                            </button>
                         </div>
                         <button
                             type="submit"
@@ -220,6 +227,10 @@ export interface TenantSelectedEvent {
             margin-bottom: 16px;
         }
 
+        .password-group {
+            position: relative;
+        }
+
         .form-control {
             width: 100%;
             padding: 12px;
@@ -227,6 +238,35 @@ export interface TenantSelectedEvent {
             border-radius: 4px;
             font-size: 14px;
             box-sizing: border-box;
+        }
+
+        .password-input {
+            padding-right: 45px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 8px;
+            line-height: 1;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .password-toggle:hover {
+            opacity: 1;
+        }
+
+        .password-toggle:focus {
+            outline: 2px solid #4285f4;
+            outline-offset: 2px;
+            border-radius: 4px;
         }
 
         .form-control:focus {
@@ -511,6 +551,7 @@ export class TenantLoginComponent implements OnInit {
     // State
     error = '';
     loading = false;
+    showPassword = false;
     useOAuth = true;
     oauthProviders: AuthProvider[] = [];
 
