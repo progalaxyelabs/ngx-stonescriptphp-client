@@ -7,9 +7,9 @@
 
 **Note:** While published as `@progalaxyelabs/ngx-stonescriptphp-client`, this is the official client for [StoneScriptPHP](https://stonescriptphp.org). Future versions will migrate to the `@stonescriptphp` namespace.
 
-## ✅ Authentication Support (v2.0.0)
+## ✅ Authentication Support (v2.0.0+)
 
-**Current Version: 2.0.0 (Modal-Based Authentication)**
+**Current Version: 1.4.0 (Full-Page Authentication Components)**
 
 **Fully compatible with StoneScriptPHP Framework v2.1.x authentication!**
 
@@ -19,7 +19,22 @@
 - ✅ **Configurable**: Choose your auth strategy via environment config
 - ✅ **All HTTP methods**: GET, POST, PUT, PATCH, DELETE with automatic token refresh
 
-### Modal-Based User Authentication (NEW in v2.0.0)
+### Full-Page Authentication UI (NEW in v1.4.0)
+- ✅ **AuthPageComponent**: Embeddable full-page auth with custom branding
+- ✅ **Customizable Branding**: Logo, colors, gradients, app name, subtitle
+- ✅ **Login/Register Toggle**: Seamless switching between modes
+- ✅ **Styled Card Layout**: Professional gradient background with centered card
+- ✅ **Zero Configuration**: Works out-of-the-box with sensible defaults
+
+```typescript
+// Quick Example: Branded auth page
+<lib-auth-page
+  [providers]="['google', 'emailPassword']"
+  (authenticated)="onAuth($event)">
+</lib-auth-page>
+```
+
+### Modal-Based User Authentication (v2.0.0)
 - ✅ **6 Auth Providers**: Google, LinkedIn, Apple, Microsoft, GitHub, Email/Password
 - ✅ **Declarative Configuration**: Enable/disable providers via environment
 - ✅ **Popup OAuth**: Social login via popup windows (no full-page redirects)
@@ -138,6 +153,76 @@ PHP Backend (StoneScriptPHP)          Angular Frontend
 4. Make type-safe HTTP calls
 
 ## Configuration
+
+### Branding Configuration (v1.4.0+)
+
+Customize your authentication pages with your brand identity:
+
+```typescript
+// app.config.ts or environment.ts
+import { NgxStoneScriptPhpClientModule, MyEnvironmentModel } from '@progalaxyelabs/ngx-stonescriptphp-client';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    NgxStoneScriptPhpClientModule.forRoot({
+      apiServer: {
+        host: 'http://localhost:9100/'
+      },
+      branding: {
+        appName: 'My Platform',           // Required: App name on auth pages
+        logo: '/assets/logo.png',         // Optional: Logo URL
+        primaryColor: '#667eea',          // Optional: Auto-generates gradient
+        gradientStart: '#667eea',         // Optional: Custom gradient start
+        gradientEnd: '#764ba2',           // Optional: Custom gradient end
+        subtitle: 'Secure authentication' // Optional: Subtitle text
+      }
+    } as MyEnvironmentModel)
+  ]
+};
+```
+
+**Using the AuthPageComponent:**
+
+```typescript
+import { Component } from '@angular/core';
+import { AuthPageComponent, TenantSelectedEvent } from '@progalaxyelabs/ngx-stonescriptphp-client';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [AuthPageComponent],
+  template: `
+    <lib-auth-page
+      [providers]="['google', 'linkedin', 'emailPassword']"
+      (authenticated)="onAuthenticated($event)">
+    </lib-auth-page>
+  `
+})
+export class LoginComponent {
+  onAuthenticated(event: TenantSelectedEvent) {
+    console.log('User authenticated:', event);
+    // Navigate to dashboard, etc.
+  }
+}
+```
+
+**Branding Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `appName` | `string` | **Required**. Application name displayed on auth pages |
+| `logo` | `string` | Optional. URL to logo image (max 200x80px recommended) |
+| `primaryColor` | `string` | Optional. Primary brand color (hex). Auto-generates gradient if no gradient colors provided |
+| `gradientStart` | `string` | Optional. Gradient start color (hex). Overrides primaryColor |
+| `gradientEnd` | `string` | Optional. Gradient end color (hex). Required if gradientStart is set |
+| `subtitle` | `string` | Optional. Subtitle text below app name |
+
+**Default Styling:**
+- Gradient: `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`
+- White card with rounded corners and shadow
+- Responsive design (mobile-friendly)
+
+---
 
 ### Authentication Modes (v1.0.0+)
 

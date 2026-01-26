@@ -5,6 +5,102 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-26
+
+### Added
+- **AuthPageComponent**: New full-page authentication component with branding support
+  - Embeddable standalone component for complete auth flows
+  - Toggle between login and register modes
+  - Wraps `TenantLoginComponent` and `RegisterComponent` in styled container
+  - Configurable auth providers (Google, LinkedIn, Apple, Microsoft, GitHub, Email/Password)
+- **Branding Configuration**: New `branding` object in `MyEnvironmentModel`
+  - `appName`: Application name displayed on auth pages
+  - `logo`: URL to logo image
+  - `primaryColor`: Primary brand color (hex)
+  - `gradientStart` / `gradientEnd`: Custom gradient colors
+  - `subtitle`: Subtitle text for auth pages
+  - Auto-generates gradient from single color if needed
+- **Public API Export**: `AuthPageComponent` now exported from main index
+
+### Usage Example
+```typescript
+// app.config.ts
+NgxStoneScriptPhpClientModule.forRoot({
+  apiServer: { host: 'http://localhost:9100/' },
+  branding: {
+    appName: 'My Platform',
+    logo: '/assets/logo.png',
+    primaryColor: '#667eea',
+    subtitle: 'Secure authentication for your business'
+  }
+})
+
+// login.component.ts
+<lib-auth-page
+  [providers]="['google', 'emailPassword']"
+  (authenticated)="onAuth($event)">
+</lib-auth-page>
+```
+
+---
+
+## [1.3.3] - 2026-01-25
+
+### Added
+- **Email Prefill Support**: Account linking flow now supports pre-filling email addresses
+  - Improves UX when linking existing accounts
+  - Seamless transition from social login to email/password registration
+
+---
+
+## [1.3.2] - 2026-01-24
+
+### Added
+- **Password Visibility Toggle**: All authentication forms now include show/hide password functionality
+  - Applied to login, register, and password reset forms
+  - Improves accessibility and user experience
+
+---
+
+## [1.3.1] - 2026-01-23
+
+### Added
+- **User Info Persistence**: User information now persists to localStorage
+  - Survives page reloads
+  - Maintains authentication state across sessions
+  - Automatically restores user context on app initialization
+
+---
+
+## [1.3.0] - 2026-01-20
+
+### Added
+- **Multi-Tenant Authentication Components**: Complete authentication UI system
+  - `TenantLoginComponent`: Login with tenant selection
+  - `RegisterComponent`: User registration with validation
+  - `LoginDialogComponent`: Modal-based login interface
+  - Support for 6 auth providers: Google, LinkedIn, Apple, Microsoft, GitHub, Email/Password
+  - OAuth popup-based authentication (no full-page redirects)
+- **Automated Testing Infrastructure**: Testing setup and utilities
+- **VerifyStatus Export**: Added to public API for email verification workflows
+
+### Documentation
+- Added AUTH-PROVIDER-CONFIG.md for provider configuration guide
+- Added MODAL-AUTH-SPEC.md for authentication specification
+- Updated README with modal authentication examples
+
+---
+
+## [1.2.0] - 2026-01-15
+
+### Added
+- **Backward Compatibility Methods**: Legacy API support for smoother migration
+- **File Upload Methods**: Support for multipart/form-data file uploads
+  - `postFormWithFiles()` method for handling file uploads
+  - Proper content-type handling for form data
+
+---
+
 ## [1.1.2] - 2025-12-26
 
 ### Changed

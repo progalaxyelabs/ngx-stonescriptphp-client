@@ -95,4 +95,23 @@ export class MyEnvironmentModel {
         csrfTokenCookieName: 'csrf_token',
         csrfHeaderName: 'X-CSRF-Token'
     };
+
+    /**
+     * Branding configuration for auth components
+     * Allows platforms to customize login/register pages without creating wrappers
+     */
+    branding?: {
+        /** Application name displayed on auth pages */
+        appName: string;
+        /** URL to logo image */
+        logo?: string;
+        /** Primary brand color (hex) */
+        primaryColor?: string;
+        /** Gradient start color (hex) */
+        gradientStart?: string;
+        /** Gradient end color (hex) */
+        gradientEnd?: string;
+        /** Subtitle text displayed on auth pages */
+        subtitle?: string;
+    };
 }

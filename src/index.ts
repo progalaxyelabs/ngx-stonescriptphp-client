@@ -13,6 +13,7 @@ export * from './my-environment.model';
 export * from './ngx-stonescriptphp-client.module';
 
 // UI Components - Embeddable (standalone components)
+export * from './lib/components/auth-page.component';
 export * from './lib/components/login-dialog.component';
 export * from './lib/components/register.component';
 export * from './lib/components/tenant-login.component';
