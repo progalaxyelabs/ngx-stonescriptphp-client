@@ -4,14 +4,15 @@ import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
 import { MyEnvironmentModel } from './my-environment.model';
 
-export type AuthProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'emailPassword';
+export type AuthProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'zoho' | 'emailPassword';
 
 export interface User {
-    user_id: number;
+    user_id?: number;          // Legacy platforms
+    id?: string;               // New auth system (UUID)
     email: string;
-    display_name: string;
+    display_name?: string;     // Optional - may not be returned
     photo_url?: string;
-    is_email_verified: boolean;
+    is_email_verified?: boolean; // Optional - may not be returned
 }
 
 export interface AuthResult {
@@ -37,6 +38,20 @@ export class AuthService {
     ) {
         // Restore user from localStorage on initialization
         this.restoreUser();
+    }
+
+    /**
+     * Hash UUID to numeric ID for backward compatibility
+     * Converts UUID string to a consistent numeric ID for legacy code
+     */
+    private hashUUID(uuid: string): number {
+        let hash = 0;
+        for (let i = 0; i < uuid.length; i++) {
+            const char = uuid.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash);
     }
 
     /**
@@ -101,9 +116,20 @@ export class AuthService {
             if (data.success && data.access_token) {
                 this.tokens.setAccessToken(data.access_token);
                 this.signinStatus.setSigninStatus(true);
-                this.updateUser(data.user);
 
-                return { success: true, user: data.user };
+                // Normalize user object to handle both response formats
+                const normalizedUser: User = {
+                    user_id: data.user.user_id ?? (data.user.id ? this.hashUUID(data.user.id) : 0),
+                    id: data.user.id ?? String(data.user.user_id),
+                    email: data.user.email,
+                    display_name: data.user.display_name ?? data.user.email.split('@')[0],
+                    photo_url: data.user.photo_url,
+                    is_email_verified: data.user.is_email_verified ?? false
+                };
+
+                this.updateUser(normalizedUser);
+
+                return { success: true, user: normalizedUser };
             }
 
             return {
@@ -151,6 +177,13 @@ export class AuthService {
      */
     async loginWithMicrosoft(): Promise<AuthResult> {
         return this.loginWithOAuth('microsoft');
+    }
+
+    /**
+     * Login with Zoho OAuth (popup window)
+     */
+    async loginWithZoho(): Promise<AuthResult> {
+        return this.loginWithOAuth('zoho');
     }
 
     /**
@@ -203,14 +236,25 @@ export class AuthService {
                 if (event.data.type === 'oauth_success') {
                     this.tokens.setAccessToken(event.data.access_token);
                     this.signinStatus.setSigninStatus(true);
-                    this.updateUser(event.data.user);
+
+                    // Normalize user object to handle both response formats
+                    const normalizedUser: User = {
+                        user_id: event.data.user.user_id ?? (event.data.user.id ? this.hashUUID(event.data.user.id) : 0),
+                        id: event.data.user.id ?? String(event.data.user.user_id),
+                        email: event.data.user.email,
+                        display_name: event.data.user.display_name ?? event.data.user.email.split('@')[0],
+                        photo_url: event.data.user.photo_url,
+                        is_email_verified: event.data.user.is_email_verified ?? false
+                    };
+
+                    this.updateUser(normalizedUser);
 
                     window.removeEventListener('message', messageHandler);
                     popup.close();
 
                     resolve({
                         success: true,
-                        user: event.data.user
+                        user: normalizedUser
                     });
                 } else if (event.data.type === 'oauth_error') {
                     window.removeEventListener('message', messageHandler);
@@ -268,11 +312,22 @@ export class AuthService {
             if (data.success && data.access_token) {
                 this.tokens.setAccessToken(data.access_token);
                 this.signinStatus.setSigninStatus(true);
-                this.updateUser(data.user);
+
+                // Normalize user object to handle both response formats
+                const normalizedUser: User = {
+                    user_id: data.user.user_id ?? (data.user.id ? this.hashUUID(data.user.id) : 0),
+                    id: data.user.id ?? String(data.user.user_id),
+                    email: data.user.email,
+                    display_name: data.user.display_name ?? data.user.email.split('@')[0],
+                    photo_url: data.user.photo_url,
+                    is_email_verified: data.user.is_email_verified ?? false
+                };
+
+                this.updateUser(normalizedUser);
 
                 return {
                     success: true,
-                    user: data.user,
+                    user: normalizedUser,
                     message: data.needs_verification ? 'Please verify your email' : undefined
                 };
             }
@@ -347,7 +402,20 @@ export class AuthService {
 
             if (data.access_token) {
                 this.tokens.setAccessToken(data.access_token);
-                this.updateUser(data.user);
+
+                // Normalize user object to handle both response formats
+                if (data.user) {
+                    const normalizedUser: User = {
+                        user_id: data.user.user_id ?? (data.user.id ? this.hashUUID(data.user.id) : 0),
+                        id: data.user.id ?? String(data.user.user_id),
+                        email: data.user.email,
+                        display_name: data.user.display_name ?? data.user.email.split('@')[0],
+                        photo_url: data.user.photo_url,
+                        is_email_verified: data.user.is_email_verified ?? false
+                    };
+                    this.updateUser(normalizedUser);
+                }
+
                 this.signinStatus.setSigninStatus(true);
                 return true;
             }
@@ -428,7 +496,16 @@ export class AuthService {
                 this.tokens.setAccessToken(result.access_token);
                 this.signinStatus.setSigninStatus(true);
                 if (result.user) {
-                    this.updateUser(result.user);
+                    // Normalize user object to handle both response formats
+                    const normalizedUser: User = {
+                        user_id: result.user.user_id ?? (result.user.id ? this.hashUUID(result.user.id) : 0),
+                        id: result.user.id ?? String(result.user.user_id),
+                        email: result.user.email,
+                        display_name: result.user.display_name ?? result.user.email.split('@')[0],
+                        photo_url: result.user.photo_url,
+                        is_email_verified: result.user.is_email_verified ?? false
+                    };
+                    this.updateUser(normalizedUser);
                 }
             }
 
@@ -497,7 +574,16 @@ export class AuthService {
                         this.signinStatus.setSigninStatus(true);
                     }
                     if (event.data.user) {
-                        this.updateUser(event.data.user);
+                        // Normalize user object to handle both response formats
+                        const normalizedUser: User = {
+                            user_id: event.data.user.user_id ?? (event.data.user.id ? this.hashUUID(event.data.user.id) : 0),
+                            id: event.data.user.id ?? String(event.data.user.user_id),
+                            email: event.data.user.email,
+                            display_name: event.data.user.display_name ?? event.data.user.email.split('@')[0],
+                            photo_url: event.data.user.photo_url,
+                            is_email_verified: event.data.user.is_email_verified ?? false
+                        };
+                        this.updateUser(normalizedUser);
                     }
 
                     window.removeEventListener('message', messageHandler);

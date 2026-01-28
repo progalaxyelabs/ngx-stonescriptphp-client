@@ -367,6 +367,16 @@ export interface TenantSelectedEvent {
             border-color: #333;
         }
 
+        .btn-zoho {
+            background-color: #f0483e;
+            color: white;
+            border: 1px solid #d63b32;
+        }
+
+        .btn-zoho:hover {
+            background-color: #d63b32;
+        }
+
         .oauth-icon {
             font-size: 18px;
         }
@@ -595,13 +605,17 @@ export class TenantLoginComponent implements OnInit {
             apple: 'Sign in with Apple',
             microsoft: 'Sign in with Microsoft',
             github: 'Sign in with GitHub',
+            zoho: 'Sign in with Zoho',
             emailPassword: 'Sign in with Email'
         };
         return labels[provider];
     }
 
     getProviderIcon(provider: AuthProvider): string | undefined {
-        return undefined;
+        const icons: Partial<Record<AuthProvider, string>> = {
+            zoho: '🔶'
+        };
+        return icons[provider];
     }
 
     toggleAuthMethod(event: Event) {
