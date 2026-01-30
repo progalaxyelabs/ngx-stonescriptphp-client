@@ -615,6 +615,7 @@ export class TenantRegisterComponent implements OnInit {
             apple: 'Sign up with Apple',
             microsoft: 'Sign up with Microsoft',
             github: 'Sign up with GitHub',
+            zoho: 'Sign up with Zoho',
             emailPassword: 'Sign up with Email'
         };
         return labels[provider];

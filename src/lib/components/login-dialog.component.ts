@@ -352,6 +352,7 @@ export class LoginDialogComponent implements OnInit {
             apple: 'Sign in with Apple',
             microsoft: 'Sign in with Microsoft',
             github: 'Sign in with GitHub',
+            zoho: 'Sign in with Zoho',
             emailPassword: 'Sign in with Email'
         };
         return labels[provider];

@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
-import { MyEnvironmentModel } from './my-environment.model';
+import { MyEnvironmentModel, AuthServerConfig } from './my-environment.model';
 
 export type AuthProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'zoho' | 'emailPassword';
 
@@ -26,10 +26,14 @@ export interface AuthResult {
 })
 export class AuthService {
     private readonly USER_STORAGE_KEY = 'progalaxyapi_user';
+    private readonly ACTIVE_AUTH_SERVER_KEY = 'progalaxyapi_active_auth_server';
 
     // Observable user state
     private userSubject = new BehaviorSubject<User | null>(null);
     public user$: Observable<User | null> = this.userSubject.asObservable();
+
+    // Current active auth server name (for multi-server mode)
+    private activeAuthServer: string | null = null;
 
     constructor(
         private tokens: TokenService,
@@ -38,6 +42,150 @@ export class AuthService {
     ) {
         // Restore user from localStorage on initialization
         this.restoreUser();
+        // Restore active auth server
+        this.restoreActiveAuthServer();
+    }
+
+    // ===== Multi-Server Support Methods =====
+
+    /**
+     * Get the current accounts URL based on configuration
+     * Supports both single-server (accountsUrl) and multi-server (authServers) modes
+     * @param serverName - Optional server name for multi-server mode
+     */
+    private getAccountsUrl(serverName?: string): string {
+        // Multi-server mode
+        if (this.environment.authServers && Object.keys(this.environment.authServers).length > 0) {
+            const targetServer = serverName || this.activeAuthServer || this.getDefaultAuthServer();
+
+            if (!targetServer) {
+                throw new Error('No auth server specified and no default server configured');
+            }
+
+            const serverConfig = this.environment.authServers[targetServer];
+            if (!serverConfig) {
+                throw new Error(`Auth server '${targetServer}' not found in configuration`);
+            }
+
+            return serverConfig.url;
+        }
+
+        // Single-server mode (backward compatibility)
+        if (this.environment.accountsUrl) {
+            return this.environment.accountsUrl;
+        }
+
+        throw new Error('No authentication server configured. Set either accountsUrl or authServers in environment config.');
+    }
+
+    /**
+     * Get the default auth server name
+     */
+    private getDefaultAuthServer(): string | null {
+        if (!this.environment.authServers) {
+            return null;
+        }
+
+        // Find server marked as default
+        for (const [name, config] of Object.entries(this.environment.authServers)) {
+            if (config.default) {
+                return name;
+            }
+        }
+
+        // If no default is marked, use the first server
+        const firstServer = Object.keys(this.environment.authServers)[0];
+        return firstServer || null;
+    }
+
+    /**
+     * Restore active auth server from localStorage
+     */
+    private restoreActiveAuthServer(): void {
+        try {
+            const savedServer = localStorage.getItem(this.ACTIVE_AUTH_SERVER_KEY);
+            if (savedServer && this.environment.authServers?.[savedServer]) {
+                this.activeAuthServer = savedServer;
+            } else {
+                // Set to default if saved server is invalid
+                this.activeAuthServer = this.getDefaultAuthServer();
+            }
+        } catch (error) {
+            console.error('Failed to restore active auth server:', error);
+            this.activeAuthServer = this.getDefaultAuthServer();
+        }
+    }
+
+    /**
+     * Save active auth server to localStorage
+     */
+    private saveActiveAuthServer(serverName: string): void {
+        try {
+            localStorage.setItem(this.ACTIVE_AUTH_SERVER_KEY, serverName);
+            this.activeAuthServer = serverName;
+        } catch (error) {
+            console.error('Failed to save active auth server:', error);
+        }
+    }
+
+    /**
+     * Get available auth servers
+     * @returns Array of server names or empty array if using single-server mode
+     */
+    public getAvailableAuthServers(): string[] {
+        if (!this.environment.authServers) {
+            return [];
+        }
+        return Object.keys(this.environment.authServers);
+    }
+
+    /**
+     * Get current active auth server name
+     * @returns Server name or null if using single-server mode
+     */
+    public getActiveAuthServer(): string | null {
+        return this.activeAuthServer;
+    }
+
+    /**
+     * Switch to a different auth server
+     * @param serverName - Name of the server to switch to
+     * @throws Error if server not found in configuration
+     */
+    public switchAuthServer(serverName: string): void {
+        if (!this.environment.authServers) {
+            throw new Error('Multi-server mode not configured. Use authServers in environment config.');
+        }
+
+        if (!this.environment.authServers[serverName]) {
+            throw new Error(`Auth server '${serverName}' not found in configuration`);
+        }
+
+        this.saveActiveAuthServer(serverName);
+    }
+
+    /**
+     * Get auth server configuration
+     * @param serverName - Optional server name (uses active server if not specified)
+     */
+    public getAuthServerConfig(serverName?: string): AuthServerConfig | null {
+        if (!this.environment.authServers) {
+            return null;
+        }
+
+        const targetServer = serverName || this.activeAuthServer || this.getDefaultAuthServer();
+        if (!targetServer) {
+            return null;
+        }
+
+        return this.environment.authServers[targetServer] || null;
+    }
+
+    /**
+     * Check if multi-server mode is enabled
+     */
+    public isMultiServerMode(): boolean {
+        return !!(this.environment.authServers && Object.keys(this.environment.authServers).length > 0);
     }
 
     /**
@@ -88,17 +236,21 @@ export class AuthService {
      * Update user subject and persist to localStorage
      */
     private updateUser(user: User | null): void {
-        this.updateUser(user);
+        this.userSubject.next(user);
         this.saveUser(user);
     }
 
     /**
      * Login with email and password
+     * @param email - User email
+     * @param password - User password
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async loginWithEmail(email: string, password: string): Promise<AuthResult> {
+    async loginWithEmail(email: string, password: string, serverName?: string): Promise<AuthResult> {
         try {
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/login`,
+                `${accountsUrl}/api/auth/login`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -146,69 +298,79 @@ export class AuthService {
 
     /**
      * Login with Google OAuth (popup window)
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async loginWithGoogle(): Promise<AuthResult> {
-        return this.loginWithOAuth('google');
+    async loginWithGoogle(serverName?: string): Promise<AuthResult> {
+        return this.loginWithOAuth('google', serverName);
     }
 
     /**
      * Login with GitHub OAuth (popup window)
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async loginWithGitHub(): Promise<AuthResult> {
-        return this.loginWithOAuth('github');
+    async loginWithGitHub(serverName?: string): Promise<AuthResult> {
+        return this.loginWithOAuth('github', serverName);
     }
 
     /**
      * Login with LinkedIn OAuth (popup window)
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async loginWithLinkedIn(): Promise<AuthResult> {
-        return this.loginWithOAuth('linkedin');
+    async loginWithLinkedIn(serverName?: string): Promise<AuthResult> {
+        return this.loginWithOAuth('linkedin', serverName);
     }
 
     /**
      * Login with Apple OAuth (popup window)
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async loginWithApple(): Promise<AuthResult> {
-        return this.loginWithOAuth('apple');
+    async loginWithApple(serverName?: string): Promise<AuthResult> {
+        return this.loginWithOAuth('apple', serverName);
     }
 
     /**
      * Login with Microsoft OAuth (popup window)
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async loginWithMicrosoft(): Promise<AuthResult> {
-        return this.loginWithOAuth('microsoft');
+    async loginWithMicrosoft(serverName?: string): Promise<AuthResult> {
+        return this.loginWithOAuth('microsoft', serverName);
     }
 
     /**
      * Login with Zoho OAuth (popup window)
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async loginWithZoho(): Promise<AuthResult> {
-        return this.loginWithOAuth('zoho');
+    async loginWithZoho(serverName?: string): Promise<AuthResult> {
+        return this.loginWithOAuth('zoho', serverName);
     }
 
     /**
      * Generic provider-based login (supports all OAuth providers)
      * @param provider - The provider identifier
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async loginWithProvider(provider: AuthProvider): Promise<AuthResult> {
+    async loginWithProvider(provider: AuthProvider, serverName?: string): Promise<AuthResult> {
         if (provider === 'emailPassword') {
             throw new Error('Use loginWithEmail() for email/password authentication');
         }
-        return this.loginWithOAuth(provider);
+        return this.loginWithOAuth(provider, serverName);
     }
 
     /**
      * Generic OAuth login handler
      * Opens popup window and listens for postMessage
+     * @param provider - OAuth provider name
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    private async loginWithOAuth(provider: string): Promise<AuthResult> {
+    private async loginWithOAuth(provider: string, serverName?: string): Promise<AuthResult> {
         return new Promise((resolve) => {
             const width = 500;
             const height = 600;
             const left = (window.screen.width - width) / 2;
             const top = (window.screen.height - height) / 2;
 
-            const oauthUrl = `${this.environment.accountsUrl}/oauth/${provider}?` +
+            const accountsUrl = this.getAccountsUrl(serverName);
+            const oauthUrl = `${accountsUrl}/oauth/${provider}?` +
                 `platform=${this.environment.platformCode}&` +
                 `mode=popup`;
 
@@ -229,7 +391,7 @@ export class AuthService {
             // Listen for message from popup
             const messageHandler = (event: MessageEvent) => {
                 // Verify origin
-                if (event.origin !== new URL(this.environment.accountsUrl).origin) {
+                if (event.origin !== new URL(accountsUrl).origin) {
                     return;
                 }
 
@@ -285,15 +447,21 @@ export class AuthService {
 
     /**
      * Register new user
+     * @param email - User email
+     * @param password - User password
+     * @param displayName - Display name
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
     async register(
         email: string,
         password: string,
-        displayName: string
+        displayName: string,
+        serverName?: string
     ): Promise<AuthResult> {
         try {
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/register`,
+                `${accountsUrl}/api/auth/register`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -346,13 +514,15 @@ export class AuthService {
 
     /**
      * Sign out user
+     * @param serverName - Optional: Specify which auth server to logout from (for multi-server mode)
      */
-    async signout(): Promise<void> {
+    async signout(serverName?: string): Promise<void> {
         try {
             const refreshToken = this.tokens.getRefreshToken();
             if (refreshToken) {
+                const accountsUrl = this.getAccountsUrl(serverName);
                 await fetch(
-                    `${this.environment.accountsUrl}/api/auth/logout`,
+                    `${accountsUrl}/api/auth/logout`,
                     {
                         method: 'POST',
                         headers: {
@@ -376,8 +546,9 @@ export class AuthService {
 
     /**
      * Check for active session (call on app init)
+     * @param serverName - Optional: Specify which auth server to check (for multi-server mode)
      */
-    async checkSession(): Promise<boolean> {
+    async checkSession(serverName?: string): Promise<boolean> {
         if (this.tokens.hasValidAccessToken()) {
             this.signinStatus.setSigninStatus(true);
             return true;
@@ -385,8 +556,9 @@ export class AuthService {
 
         // Try to refresh using httpOnly cookie
         try {
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/refresh`,
+                `${accountsUrl}/api/auth/refresh`,
                 {
                     method: 'POST',
                     credentials: 'include'
@@ -472,8 +644,9 @@ export class AuthService {
             }
 
             // Email/password registration
+            const accountsUrl = this.getAccountsUrl();
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/register-tenant`,
+                `${accountsUrl}/api/auth/register-tenant`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -539,7 +712,8 @@ export class AuthService {
             const top = (window.screen.height - height) / 2;
 
             // Build OAuth URL with tenant registration params
-            const oauthUrl = `${this.environment.accountsUrl}/oauth/${provider}?` +
+            const accountsUrl = this.getAccountsUrl();
+            const oauthUrl = `${accountsUrl}/oauth/${provider}?` +
                 `platform=${this.environment.platformCode}&` +
                 `mode=popup&` +
                 `action=register_tenant&` +
@@ -563,7 +737,7 @@ export class AuthService {
             // Listen for message from popup
             const messageHandler = (event: MessageEvent) => {
                 // Verify origin
-                if (event.origin !== new URL(this.environment.accountsUrl).origin) {
+                if (event.origin !== new URL(accountsUrl).origin) {
                     return;
                 }
 
@@ -623,8 +797,9 @@ export class AuthService {
 
     /**
      * Get all tenant memberships for the authenticated user
+     * @param serverName - Optional: Specify which auth server to query (for multi-server mode)
      */
-    async getTenantMemberships(): Promise<{
+    async getTenantMemberships(serverName?: string): Promise<{
         memberships: Array<{
             tenant_id: string;
             slug: string;
@@ -635,8 +810,9 @@ export class AuthService {
         }>;
     }> {
         try {
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/memberships`,
+                `${accountsUrl}/api/auth/memberships`,
                 {
                     method: 'GET',
                     headers: {
@@ -659,15 +835,18 @@ export class AuthService {
     /**
      * Select a tenant for the current session
      * Updates the JWT token with tenant context
+     * @param tenantId - Tenant ID to select
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async selectTenant(tenantId: string): Promise<{
+    async selectTenant(tenantId: string, serverName?: string): Promise<{
         success: boolean;
         message?: string;
         access_token?: string;
     }> {
         try {
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/select-tenant`,
+                `${accountsUrl}/api/auth/select-tenant`,
                 {
                     method: 'POST',
                     headers: {
@@ -703,14 +882,17 @@ export class AuthService {
 
     /**
      * Check if a tenant slug is available
+     * @param slug - Tenant slug to check
+     * @param serverName - Optional: Specify which auth server to query (for multi-server mode)
      */
-    async checkTenantSlugAvailable(slug: string): Promise<{
+    async checkTenantSlugAvailable(slug: string, serverName?: string): Promise<{
         available: boolean;
         suggestion?: string;
     }> {
         try {
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/check-tenant-slug/${slug}`,
+                `${accountsUrl}/api/auth/check-tenant-slug/${slug}`,
                 {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
@@ -807,10 +989,11 @@ export class AuthService {
     /**
      * @deprecated Check if user exists by calling /api/auth/check-email endpoint
      */
-    async getUserProfile(email: string): Promise<User | null> {
+    async getUserProfile(email: string, serverName?: string): Promise<User | null> {
         try {
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/check-email`,
+                `${accountsUrl}/api/auth/check-email`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -827,16 +1010,19 @@ export class AuthService {
 
     /**
      * Check if user has completed onboarding (has a tenant)
+     * @param identityId - User identity ID
+     * @param serverName - Optional: Specify which auth server to query (for multi-server mode)
      */
-    async checkOnboardingStatus(identityId: string): Promise<{
+    async checkOnboardingStatus(identityId: string, serverName?: string): Promise<{
         onboarded: boolean;
         tenant_slug?: string;
         tenant_name?: string;
         role?: string;
     }> {
         try {
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/onboarding/status?platform_code=${this.environment.platformCode}&identity_id=${identityId}`,
+                `${accountsUrl}/api/auth/onboarding/status?platform_code=${this.environment.platformCode}&identity_id=${identityId}`,
                 {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' },
@@ -856,8 +1042,11 @@ export class AuthService {
 
     /**
      * Complete tenant onboarding (create tenant with country + org name)
+     * @param countryCode - Country code
+     * @param tenantName - Tenant organization name
+     * @param serverName - Optional: Specify which auth server to use (for multi-server mode)
      */
-    async completeTenantOnboarding(countryCode: string, tenantName: string): Promise<{
+    async completeTenantOnboarding(countryCode: string, tenantName: string, serverName?: string): Promise<{
         tenant: {
             id: string;
             slug: string;
@@ -872,8 +1061,9 @@ export class AuthService {
                 throw new Error('Not authenticated');
             }
 
+            const accountsUrl = this.getAccountsUrl(serverName);
             const response = await fetch(
-                `${this.environment.accountsUrl}/api/auth/register-tenant`,
+                `${accountsUrl}/api/auth/register-tenant`,
                 {
                     method: 'POST',
                     headers: {

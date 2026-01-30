@@ -40,6 +40,18 @@ export interface AuthConfig {
     csrfHeaderName?: string;
 }
 
+/**
+ * Authentication server configuration
+ */
+export interface AuthServerConfig {
+    /** Server URL (e.g., 'https://accounts.progalaxyelabs.com') */
+    url: string;
+    /** JWKS endpoint for token validation (optional, defaults to /api/auth/jwks) */
+    jwksEndpoint?: string;
+    /** Whether this is the default server */
+    default?: boolean;
+}
+
 export class MyEnvironmentModel {
     production: boolean = true
 
@@ -50,10 +62,24 @@ export class MyEnvironmentModel {
     platformCode: string = '';
 
     /**
-     * Accounts platform URL for centralized authentication
+     * Accounts platform URL for centralized authentication (single-server mode)
      * @example 'https://accounts.progalaxyelabs.com'
+     * @deprecated Use authServers for multi-server support
      */
     accountsUrl: string = '';
+
+    /**
+     * Multiple authentication servers configuration
+     * Enables platforms to authenticate against different identity providers
+     * @example
+     * ```typescript
+     * authServers: {
+     *   customer: { url: 'https://auth.progalaxyelabs.com', default: true },
+     *   employee: { url: 'https://admin-auth.progalaxyelabs.com' }
+     * }
+     * ```
+     */
+    authServers?: Record<string, AuthServerConfig>;
 
     firebase: {
         projectId: string

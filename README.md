@@ -19,6 +19,23 @@
 - ✅ **Configurable**: Choose your auth strategy via environment config
 - ✅ **All HTTP methods**: GET, POST, PUT, PATCH, DELETE with automatic token refresh
 
+### Multi-Auth Server Support (NEW)
+- ✅ **Multiple identity providers**: Authenticate against different auth servers (customer auth vs employee auth)
+- ✅ **Runtime server switching**: Switch between auth servers dynamically
+- ✅ **Per-request server selection**: Specify server for individual auth calls
+- ✅ **Backward compatible**: Single-server config still works
+- ✅ **Use case**: Shared admin platforms that accept both customer and employee logins
+
+```typescript
+// Multi-server configuration
+authServers: {
+  customer: { url: 'https://auth.progalaxyelabs.com', default: true },
+  employee: { url: 'https://admin-auth.progalaxyelabs.com' }
+}
+```
+
+See [MULTI-AUTH-SERVER.md](MULTI-AUTH-SERVER.md) for complete documentation.
+
 ### Full-Page Authentication UI (NEW in v1.4.0)
 - ✅ **AuthPageComponent**: Embeddable full-page auth with custom branding
 - ✅ **Customizable Branding**: Logo, colors, gradients, app name, subtitle
@@ -52,7 +69,7 @@ authProviders: {
 
 See [Configuration](#configuration) and [AUTH-PROVIDER-CONFIG.md](AUTH-PROVIDER-CONFIG.md) for details.
 
-📖 **Documentation**: [CHANGELOG](docs/CHANGELOG.md) | [Auth Compatibility](docs/AUTH_COMPATIBILITY.md) | [Provider Config](AUTH-PROVIDER-CONFIG.md) | [Modal Auth Spec](MODAL-AUTH-SPEC.md)
+📖 **Documentation**: [CHANGELOG](docs/CHANGELOG.md) | [Auth Compatibility](docs/AUTH_COMPATIBILITY.md) | [Provider Config](AUTH-PROVIDER-CONFIG.md) | [Modal Auth Spec](MODAL-AUTH-SPEC.md) | [Multi-Auth Server](MULTI-AUTH-SERVER.md)
 
 ---
 
