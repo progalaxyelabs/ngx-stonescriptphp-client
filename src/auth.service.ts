@@ -7,12 +7,12 @@ import { MyEnvironmentModel, AuthServerConfig } from './my-environment.model';
 export type AuthProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'zoho' | 'emailPassword';
 
 export interface User {
-    user_id?: number;          // Legacy platforms
-    id?: string;               // New auth system (UUID)
+    user_id: number;           // Always provided (legacy platforms or hashed UUID)
+    id: string;                // Always provided (new auth system UUID or stringified user_id)
     email: string;
-    display_name?: string;     // Optional - may not be returned
+    display_name: string;      // Always provided (fallback to email prefix if missing)
     photo_url?: string;
-    is_email_verified?: boolean; // Optional - may not be returned
+    is_email_verified: boolean; // Always provided (defaults to false if missing)
 }
 
 export interface AuthResult {

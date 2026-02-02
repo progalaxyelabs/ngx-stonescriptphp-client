@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-02-02
+
+### Fixed
+- **BREAKING CHANGE FIX**: Reverted `User` interface to make fields required that are always provided
+  - `display_name` is now required again (was incorrectly made optional in v1.5.0)
+  - `user_id` is now required (always provided via legacy ID or hashed UUID)
+  - `id` is now required (always provided via UUID or stringified user_id)
+  - `is_email_verified` is now required (defaults to `false` if missing from backend)
+  - **Rationale**: The library code always normalizes user objects with fallback values, so these fields are never actually undefined at runtime. Making them optional in v1.5.0 caused TypeScript strict null check errors in consuming apps.
+
+### Migration Notes
+If you upgraded to v1.5.0 and added null checks for `user.display_name`, you can safely remove them:
+```typescript
+// v1.5.0 workaround (no longer needed):
+const name = user.display_name ?? 'Unknown';
+
+// v1.5.1+ (works correctly):
+const name = user.display_name;
+```
+
+---
+
+## [1.5.0] - 2026-01-28 (DEPRECATED - use 1.5.1+)
+
+### Added
+- **Zoho OAuth Support**: New `loginWithZoho()` method
+- Added `'zoho'` to `AuthProvider` type
+
+### Changed (BREAKING - Fixed in 1.5.1)
+- Modified `User` interface to make several fields optional
+  - This was intended to match backend response flexibility but caused TypeScript errors
+  - **Fixed in v1.5.1** - fields are required again since library provides fallbacks
+
+---
+
 ## [1.4.0] - 2026-01-26
 
 ### Added
