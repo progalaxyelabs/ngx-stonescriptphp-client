@@ -110,6 +110,15 @@ export class MyEnvironmentModel {
     } = { host: '' }
 
     /**
+     * Files service server configuration
+     * Used by FilesService for file upload/download operations
+     * @example { host: 'https://files.progalaxyelabs.com/api/' }
+     */
+    filesServer?: {
+        host: string
+    }
+
+    /**
      * Authentication configuration
      * @default { mode: 'cookie', refreshEndpoint: '/auth/refresh', useCsrf: true }
      */

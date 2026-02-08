@@ -10,6 +10,8 @@ export * from './token.service';
 export * from './csrf.service';
 export * from './api-response.model';
 export * from './my-environment.model';
+export * from './files.service';
+export * from './files.model';
 export * from './ngx-stonescriptphp-client.module';
 
 // UI Components - Embeddable (standalone components)
