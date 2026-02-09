@@ -2,6 +2,7 @@ import { Component, OnInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, AuthProvider } from '../../auth.service';
+import { ProviderRegistryService } from '../../provider-registry.service';
 
 @Component({
     selector: 'lib-login-dialog',
@@ -62,7 +63,8 @@ import { AuthService, AuthProvider } from '../../auth.service';
                         <button
                             (click)="onOAuthLogin(provider)"
                             [disabled]="loading"
-                            class="btn btn-oauth btn-{{ provider }}">
+                            [class]="'btn btn-oauth ' + getProviderCssClass(provider)"
+                            [ngStyle]="getProviderButtonStyle(provider)">
                             @if (getProviderIcon(provider)) {
                                 <span class="oauth-icon">
                                     {{ getProviderIcon(provider) }}
@@ -328,7 +330,10 @@ export class LoginDialogComponent implements OnInit {
 
     oauthProviders: AuthProvider[] = [];
 
-    constructor(private auth: AuthService) {}
+    constructor(
+        private auth: AuthService,
+        private providerRegistry: ProviderRegistryService
+    ) {}
 
     ngOnInit() {
         if (!this.providers || this.providers.length === 0) {
@@ -346,21 +351,19 @@ export class LoginDialogComponent implements OnInit {
     }
 
     getProviderLabel(provider: AuthProvider): string {
-        const labels: Record<AuthProvider, string> = {
-            google: 'Sign in with Google',
-            linkedin: 'Sign in with LinkedIn',
-            apple: 'Sign in with Apple',
-            microsoft: 'Sign in with Microsoft',
-            github: 'Sign in with GitHub',
-            zoho: 'Sign in with Zoho',
-            emailPassword: 'Sign in with Email'
-        };
-        return labels[provider];
+        return this.providerRegistry.getLabel(provider);
     }
 
     getProviderIcon(provider: AuthProvider): string | undefined {
-        // Platforms can customize icons via CSS classes: .btn-google, .btn-linkedin, etc.
-        return undefined;
+        return this.providerRegistry.getIcon(provider);
+    }
+
+    getProviderCssClass(provider: AuthProvider): string {
+        return this.providerRegistry.getCssClass(provider);
+    }
+
+    getProviderButtonStyle(provider: AuthProvider): Record<string, string> | null {
+        return this.providerRegistry.getButtonStyle(provider);
     }
 
     async onEmailLogin() {

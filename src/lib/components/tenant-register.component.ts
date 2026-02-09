@@ -2,6 +2,7 @@ import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, AuthProvider } from '../../auth.service';
+import { ProviderRegistryService } from '../../provider-registry.service';
 
 export interface TenantCreatedEvent {
   tenant: { id: string; name: string; slug: string };
@@ -85,7 +86,8 @@ export interface TenantCreatedEvent {
                                     type="button"
                                     (click)="onOAuthRegister(provider)"
                                     [disabled]="loading || !isFormValid()"
-                                    class="btn btn-oauth btn-{{ provider }}">
+                                    [class]="'btn btn-oauth ' + getProviderCssClass(provider)"
+                                    [ngStyle]="getProviderButtonStyle(provider)">
                                     @if (getProviderIcon(provider)) {
                                         <span class="oauth-icon">
                                             {{ getProviderIcon(provider) }}
@@ -588,7 +590,10 @@ export class TenantRegisterComponent implements OnInit {
     showPassword = false;
     showConfirmPassword = false;
 
-    constructor(private auth: AuthService) {}
+    constructor(
+        private auth: AuthService,
+        private providerRegistry: ProviderRegistryService
+    ) {}
 
     ngOnInit() {
         if (!this.providers || this.providers.length === 0) {
@@ -609,20 +614,19 @@ export class TenantRegisterComponent implements OnInit {
     }
 
     getProviderLabel(provider: AuthProvider): string {
-        const labels: Record<AuthProvider, string> = {
-            google: 'Sign up with Google',
-            linkedin: 'Sign up with LinkedIn',
-            apple: 'Sign up with Apple',
-            microsoft: 'Sign up with Microsoft',
-            github: 'Sign up with GitHub',
-            zoho: 'Sign up with Zoho',
-            emailPassword: 'Sign up with Email'
-        };
-        return labels[provider];
+        return this.providerRegistry.getSignupLabel(provider);
     }
 
     getProviderIcon(provider: AuthProvider): string | undefined {
-        return undefined;
+        return this.providerRegistry.getIcon(provider);
+    }
+
+    getProviderCssClass(provider: AuthProvider): string {
+        return this.providerRegistry.getCssClass(provider);
+    }
+
+    getProviderButtonStyle(provider: AuthProvider): Record<string, string> | null {
+        return this.providerRegistry.getButtonStyle(provider);
     }
 
     onTenantNameChange() {

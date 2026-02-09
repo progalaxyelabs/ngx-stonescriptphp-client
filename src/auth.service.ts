@@ -2,9 +2,16 @@ import { Injectable, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
-import { MyEnvironmentModel, AuthServerConfig } from './my-environment.model';
+import { MyEnvironmentModel, AuthServerConfig, OAuthProviderConfig } from './my-environment.model';
 
-export type AuthProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'zoho' | 'emailPassword';
+export type BuiltInProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'zoho' | 'emailPassword';
+
+/**
+ * Authentication provider identifier.
+ * Includes all built-in providers plus any custom string identifier.
+ * The (string & {}) trick preserves autocomplete for built-in values.
+ */
+export type AuthProvider = BuiltInProvider | (string & {});
 
 export interface User {
     user_id: number;           // Always provided (legacy platforms or hashed UUID)

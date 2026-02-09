@@ -52,6 +52,26 @@ export interface AuthServerConfig {
     default?: boolean;
 }
 
+/**
+ * Configuration for a custom OAuth provider.
+ * Used to register custom providers via the ProviderRegistryService
+ * or through the environment's customProviders field.
+ */
+export interface OAuthProviderConfig {
+    /** Display label for the provider (e.g., "Okta") */
+    label: string;
+    /** Optional icon character or emoji to display */
+    icon?: string;
+    /** Optional CSS class to apply to the button (e.g., "btn-okta") */
+    cssClass?: string;
+    /** Optional inline button styles for custom branding */
+    buttonStyle?: {
+        borderColor?: string;
+        backgroundColor?: string;
+        color?: string;
+    };
+}
+
 export class MyEnvironmentModel {
     production: boolean = true
 
@@ -130,6 +150,20 @@ export class MyEnvironmentModel {
         csrfTokenCookieName: 'csrf_token',
         csrfHeaderName: 'X-CSRF-Token'
     };
+
+    /**
+     * Custom OAuth provider configurations.
+     * Register additional OAuth providers beyond the built-in ones
+     * (google, linkedin, apple, microsoft, github, zoho).
+     * @example
+     * ```typescript
+     * customProviders: {
+     *   okta: { label: 'Sign in with Okta', cssClass: 'btn-okta', buttonStyle: { borderColor: '#007dc1' } },
+     *   keycloak: { label: 'Sign in with Keycloak', icon: '🔑' }
+     * }
+     * ```
+     */
+    customProviders?: Record<string, OAuthProviderConfig>;
 
     /**
      * Branding configuration for auth components

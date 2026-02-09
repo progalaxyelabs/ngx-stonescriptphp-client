@@ -12,6 +12,7 @@ export * from './api-response.model';
 export * from './my-environment.model';
 export * from './files.service';
 export * from './files.model';
+export * from './provider-registry.service';
 export * from './ngx-stonescriptphp-client.module';
 
 // UI Components - Embeddable (standalone components)
@@ -26,7 +27,8 @@ export * from './lib/components/tenant-login-dialog.component';
 export * from './lib/components/tenant-register-dialog.component';
 
 // Re-export types for convenience
-export type { AuthProvider, User, AuthResult } from './auth.service';
+export type { AuthProvider, BuiltInProvider, User, AuthResult } from './auth.service';
+export type { OAuthProviderConfig } from './my-environment.model';
 export { VerifyStatus } from './signin-status.service';
 
 // Multi-tenant types
