@@ -130,6 +130,16 @@ export class MyEnvironmentModel {
     } = { host: '' }
 
     /**
+     * Authentication service server configuration
+     * Use this when auth is on a different server than the API
+     * Falls back to accountsUrl if not specified
+     * @example { host: 'https://auth.progalaxyelabs.com' }
+     */
+    authServer?: {
+        host: string
+    }
+
+    /**
      * Files service server configuration
      * Used by FilesService for file upload/download operations
      * @example { host: 'https://files.progalaxyelabs.com/api/' }

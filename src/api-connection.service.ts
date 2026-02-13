@@ -221,10 +221,11 @@ export class ApiConnectionService {
      */
     private async refreshAccessTokenCookieMode(): Promise<boolean> {
         try {
-            // Handle both absolute URLs (different server) and relative paths (same server)
-            const refreshTokenUrl = this.authConfig.refreshEndpoint!.startsWith('http')
-                ? this.authConfig.refreshEndpoint!
-                : this.host + this.authConfig.refreshEndpoint!
+            // Determine auth server: authServer.host > accountsUrl > apiServer.host
+            const authHost = this.environment.authServer?.host
+                || this.environment.accountsUrl
+                || this.host
+            const refreshTokenUrl = authHost + this.authConfig.refreshEndpoint!
             const headers: any = {
                 'Content-Type': 'application/json'
             }
@@ -288,10 +289,11 @@ export class ApiConnectionService {
                 return false
             }
 
-            // Handle both absolute URLs (different server) and relative paths (same server)
-            const refreshTokenUrl = this.authConfig.refreshEndpoint!.startsWith('http')
-                ? this.authConfig.refreshEndpoint!
-                : this.host + this.authConfig.refreshEndpoint!
+            // Determine auth server: authServer.host > accountsUrl > apiServer.host
+            const authHost = this.environment.authServer?.host
+                || this.environment.accountsUrl
+                || this.host
+            const refreshTokenUrl = authHost + this.authConfig.refreshEndpoint!
             let refreshTokenResponse = await fetch(refreshTokenUrl, {
                 method: 'POST',
                 mode: 'cors',
