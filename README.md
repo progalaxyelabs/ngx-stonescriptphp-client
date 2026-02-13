@@ -9,7 +9,12 @@
 
 ## ✅ Authentication Support (v2.0.0+)
 
-**Current Version: 1.4.0 (Full-Page Authentication Components)**
+**Current Version: 1.8.1**
+
+### Recent Updates
+- **v1.8.1**: Renamed `authServer` to `accountsServer` for naming consistency
+- **v1.8.0**: Added `accountsServer` property for microservices architecture
+- **v1.7.1**: Fixed URL concatenation (removed trailing slash requirement)
 
 **Fully compatible with StoneScriptPHP Framework v2.1.x authentication!**
 
@@ -171,6 +176,40 @@ PHP Backend (StoneScriptPHP)          Angular Frontend
 
 ## Configuration
 
+### Server Configuration (v1.7.1+)
+
+**Important:** As of v1.7.1, host URLs should **NOT** include trailing slashes. Endpoints should include leading slashes.
+
+```typescript
+// app.config.ts
+NgxStoneScriptPhpClientModule.forRoot({
+  // ✅ Correct: No trailing slash
+  apiServer: { host: 'http://localhost:3011' },
+
+  // ❌ Wrong: Has trailing slash
+  // apiServer: { host: 'http://localhost:3011/' },
+})
+```
+
+**For Microservices:**
+If your authentication is on a different server than your API, use `accountsServer` (v1.8.1+):
+
+```typescript
+NgxStoneScriptPhpClientModule.forRoot({
+  apiServer: { host: 'http://localhost:3011' },      // Business API
+  accountsServer: { host: 'http://localhost:3139' }, // Auth service
+  auth: {
+    mode: 'body',
+    refreshEndpoint: '/api/auth/refresh'  // Just the path, no server URL
+  }
+})
+```
+
+**Fallback chain for auth server:**
+1. `accountsServer.host` (if specified)
+2. `accountsUrl` (deprecated, for backward compatibility)
+3. `apiServer.host` (same-server auth)
+
 ### Branding Configuration (v1.4.0+)
 
 Customize your authentication pages with your brand identity:
@@ -183,7 +222,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     NgxStoneScriptPhpClientModule.forRoot({
       apiServer: {
-        host: 'http://localhost:9100/'
+        host: 'http://localhost:9100'  // No trailing slash
       },
       branding: {
         appName: 'My Platform',           // Required: App name on auth pages
