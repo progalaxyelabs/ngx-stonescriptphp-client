@@ -10,7 +10,7 @@ import { CsrfService } from './csrf.service';
 })
 export class ApiConnectionService {
 
-    private host = '' // contains trailing slash
+    private host = '' // base URL without trailing slash
 
     private accessToken = ''
 
@@ -91,7 +91,7 @@ export class ApiConnectionService {
     }
 
     async get<DataType>(endpoint: string, queryParamsObj?: any ): Promise<ApiResponse<DataType>> {
-        const url = this.host + endpoint.replace(/^\/+/, '') + this.buildQueryString(queryParamsObj)
+        const url = this.host + endpoint + this.buildQueryString(queryParamsObj)
         const fetchOptions: RequestInit = {
             mode: 'cors',
             redirect: 'error'
@@ -100,7 +100,7 @@ export class ApiConnectionService {
     }
 
     async post<DataType>(pathWithQueryParams: string, data: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + pathWithQueryParams.replace(/^\/+/, '')
+        const url = this.host + pathWithQueryParams
         const fetchOptions: RequestInit = {
             method: 'POST',
             mode: 'cors',
@@ -114,7 +114,7 @@ export class ApiConnectionService {
     }
 
     async put<DataType>(pathWithQueryParams: string, data: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + pathWithQueryParams.replace(/^\/+/, '')
+        const url = this.host + pathWithQueryParams
         const fetchOptions: RequestInit = {
             method: 'PUT',
             mode: 'cors',
@@ -128,7 +128,7 @@ export class ApiConnectionService {
     }
 
     async patch<DataType>(pathWithQueryParams: string, data: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + pathWithQueryParams.replace(/^\/+/, '')
+        const url = this.host + pathWithQueryParams
         const fetchOptions: RequestInit = {
             method: 'PATCH',
             mode: 'cors',
@@ -142,7 +142,7 @@ export class ApiConnectionService {
     }
 
     async delete<DataType>(endpoint: string, queryParamsObj?: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + endpoint.replace(/^\/+/, '') + this.buildQueryString(queryParamsObj)
+        const url = this.host + endpoint + this.buildQueryString(queryParamsObj)
         const fetchOptions: RequestInit = {
             method: 'DELETE',
             mode: 'cors',
@@ -221,7 +221,10 @@ export class ApiConnectionService {
      */
     private async refreshAccessTokenCookieMode(): Promise<boolean> {
         try {
-            const refreshTokenUrl = this.host + this.authConfig.refreshEndpoint!.replace(/^\/+/, '')
+            // Handle both absolute URLs (different server) and relative paths (same server)
+            const refreshTokenUrl = this.authConfig.refreshEndpoint!.startsWith('http')
+                ? this.authConfig.refreshEndpoint!
+                : this.host + this.authConfig.refreshEndpoint!
             const headers: any = {
                 'Content-Type': 'application/json'
             }
@@ -285,7 +288,10 @@ export class ApiConnectionService {
                 return false
             }
 
-            const refreshTokenUrl = this.host + this.authConfig.refreshEndpoint!.replace(/^\/+/, '')
+            // Handle both absolute URLs (different server) and relative paths (same server)
+            const refreshTokenUrl = this.authConfig.refreshEndpoint!.startsWith('http')
+                ? this.authConfig.refreshEndpoint!
+                : this.host + this.authConfig.refreshEndpoint!
             let refreshTokenResponse = await fetch(refreshTokenUrl, {
                 method: 'POST',
                 mode: 'cors',
@@ -353,7 +359,7 @@ export class ApiConnectionService {
      */
     async uploadDrawing<DataType>(formData: FormData): Promise<ApiResponse<DataType>> {
         const uploadHost = (this.environment as any).uploadServer?.host || this.host
-        const url = uploadHost + 'upload/drawing'
+        const url = uploadHost + '/upload/drawing'
         const fetchOptions: RequestInit = {
             method: 'POST',
             mode: 'cors',
@@ -369,7 +375,7 @@ export class ApiConnectionService {
      */
     async uploadImage<DataType>(formData: FormData): Promise<ApiResponse<DataType>> {
         const uploadHost = (this.environment as any).uploadServer?.host || this.host
-        const url = uploadHost + 'upload/image'
+        const url = uploadHost + '/upload/image'
         const fetchOptions: RequestInit = {
             method: 'POST',
             mode: 'cors',
