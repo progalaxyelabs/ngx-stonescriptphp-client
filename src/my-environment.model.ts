@@ -130,12 +130,12 @@ export class MyEnvironmentModel {
     } = { host: '' }
 
     /**
-     * Authentication service server configuration
+     * Accounts/Authentication service server configuration
      * Use this when auth is on a different server than the API
-     * Falls back to accountsUrl if not specified
-     * @example { host: 'https://auth.progalaxyelabs.com' }
+     * Replaces the deprecated accountsUrl string with structured config
+     * @example { host: 'https://accounts.progalaxyelabs.com' }
      */
-    authServer?: {
+    accountsServer?: {
         host: string
     }
 

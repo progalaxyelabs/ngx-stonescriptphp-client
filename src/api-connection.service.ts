@@ -221,8 +221,8 @@ export class ApiConnectionService {
      */
     private async refreshAccessTokenCookieMode(): Promise<boolean> {
         try {
-            // Determine auth server: authServer.host > accountsUrl > apiServer.host
-            const authHost = this.environment.authServer?.host
+            // Determine auth server: accountsServer.host > accountsUrl > apiServer.host
+            const authHost = this.environment.accountsServer?.host
                 || this.environment.accountsUrl
                 || this.host
             const refreshTokenUrl = authHost + this.authConfig.refreshEndpoint!
@@ -289,8 +289,8 @@ export class ApiConnectionService {
                 return false
             }
 
-            // Determine auth server: authServer.host > accountsUrl > apiServer.host
-            const authHost = this.environment.authServer?.host
+            // Determine auth server: accountsServer.host > accountsUrl > apiServer.host
+            const authHost = this.environment.accountsServer?.host
                 || this.environment.accountsUrl
                 || this.host
             const refreshTokenUrl = authHost + this.authConfig.refreshEndpoint!
