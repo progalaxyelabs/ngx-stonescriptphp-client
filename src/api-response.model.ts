@@ -1,24 +1,32 @@
 export class ApiResponse<DataType> {
-    private status: string
-    private data: any
-    private message: string
+    public readonly status: string
+    public readonly data: DataType | null
+    public readonly message: string
 
-    constructor(status: string, data: any = {}, message: string = '') {
+    get success(): boolean {
+        return this.status === 'ok'
+    }
+
+    get errors(): string[] {
+        return this.message ? [this.message] : []
+    }
+
+    constructor(status: string, data: any = null, message: string = '') {
         this.status = status
-        this.data = data
+        this.data = data || null
         this.message = message
     }
 
     onOk(callback: (data: DataType) => void): ApiResponse<DataType> {
         if (this.status === 'ok') {
-            callback(this.data)
+            callback(this.data as DataType)
         }
         return this
     }
 
     onNotOk(callback: (message: string, data: DataType) => void): ApiResponse<DataType> {
         if (this.status === 'not ok') {
-            callback(this.message, this.data)
+            callback(this.message, this.data as DataType)
         }
         return this
     }
