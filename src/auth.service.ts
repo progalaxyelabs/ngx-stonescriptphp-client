@@ -196,6 +196,21 @@ export class AuthService {
     }
 
     /**
+     * Get the platform's own API base URL
+     * Used for routes that go through the platform API proxy (e.g. register-tenant)
+     * @throws Error if no API URL is configured
+     */
+    private getPlatformApiUrl(): string {
+        if (this.environment.apiUrl) {
+            return this.environment.apiUrl;
+        }
+        if (this.environment.apiServer?.host) {
+            return this.environment.apiServer.host;
+        }
+        throw new Error('No platform API URL configured. Set apiUrl in environment config.');
+    }
+
+    /**
      * Hash UUID to numeric ID for backward compatibility
      * Converts UUID string to a consistent numeric ID for legacy code
      */
@@ -650,10 +665,10 @@ export class AuthService {
                 );
             }
 
-            // Email/password registration
-            const accountsUrl = this.getAccountsUrl();
+            // Email/password registration — route through platform API proxy
+            const apiUrl = this.getPlatformApiUrl();
             const response = await fetch(
-                `${accountsUrl}/api/auth/register-tenant`,
+                `${apiUrl}/auth/register-tenant`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1068,9 +1083,10 @@ export class AuthService {
                 throw new Error('Not authenticated');
             }
 
-            const accountsUrl = this.getAccountsUrl(serverName);
+            // Route through platform API proxy — PHP API adds platform_secret header
+            const apiUrl = this.getPlatformApiUrl();
             const response = await fetch(
-                `${accountsUrl}/api/auth/register-tenant`,
+                `${apiUrl}/auth/register-tenant`,
                 {
                     method: 'POST',
                     headers: {

@@ -122,6 +122,13 @@ export class MyEnvironmentModel {
             messagingSenderId: '',
             measurementId: ''
         }
+    /**
+     * Platform's own API base URL (e.g., '//api.medstoreapp.in')
+     * Used to route registration through the platform API proxy instead of auth directly
+     * @example '//api.medstoreapp.in'
+     */
+    apiUrl?: string;
+
     apiServer: {
         host: string
     } = { host: '' }
