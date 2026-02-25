@@ -636,6 +636,10 @@ export class AuthService {
             );
 
             if (!response.ok) {
+                // Refresh failed (expired, revoked, wrong keypair) — clear stale tokens
+                // so the user gets a clean login page, not a broken retry loop
+                this.tokens.clear();
+                this.updateUser(null);
                 this.signinStatus.setSigninStatus(false);
                 return false;
             }
@@ -655,8 +659,14 @@ export class AuthService {
                 return true;
             }
 
+            // Response OK but no token — clear stale state
+            this.tokens.clear();
+            this.updateUser(null);
             return false;
         } catch (error) {
+            // Network error — clear stale state to avoid retry loops
+            this.tokens.clear();
+            this.updateUser(null);
             this.signinStatus.setSigninStatus(false);
             return false;
         }

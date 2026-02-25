@@ -63,8 +63,8 @@ export class TokenService {
     }
 
     /**
-     * Check if there is a valid (non-empty) access token
-     * @returns True if access token exists and is not empty
+     * Check if there is a non-empty access token.
+     * Token is treated as opaque — validity is determined by the auth server.
      */
     hasValidAccessToken(): boolean {
         const token = this.getAccessToken()
