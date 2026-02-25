@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
-import { MyEnvironmentModel, AuthServerConfig, OAuthProviderConfig } from './my-environment.model';
+import { MyEnvironmentModel, AuthServerConfig, OAuthProviderConfig, AuthResponseMap } from './my-environment.model';
 
 export type BuiltInProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'zoho' | 'emailPassword';
 
@@ -210,6 +210,68 @@ export class AuthService {
         throw new Error('No platform API URL configured. Set apiUrl in environment config.');
     }
 
+    // ===== Auth Response Mapping Helpers =====
+
+    /** Default response map: StoneScriptPHP format */
+    private get responseMap(): AuthResponseMap {
+        return this.environment.authResponseMap ?? {
+            successPath: 'status',
+            successValue: 'ok',
+            accessTokenPath: 'data.access_token',
+            refreshTokenPath: 'data.refresh_token',
+            userPath: 'data.user',
+            errorMessagePath: 'message'
+        };
+    }
+
+    /** Resolve a dot-notation path on an object (e.g., 'data.access_token') */
+    private resolvePath(obj: any, path: string): any {
+        return path.split('.').reduce((o, key) => o?.[key], obj);
+    }
+
+    /** Check if an auth response indicates success */
+    private isAuthSuccess(data: any): boolean {
+        const map = this.responseMap;
+        if (map.successPath) {
+            return this.resolvePath(data, map.successPath) === (map.successValue ?? 'ok');
+        }
+        // No successPath configured — success = access token present
+        return !!this.resolvePath(data, map.accessTokenPath);
+    }
+
+    /** Extract access token from auth response */
+    private getAccessToken(data: any): string | undefined {
+        return this.resolvePath(data, this.responseMap.accessTokenPath);
+    }
+
+    /** Extract refresh token from auth response */
+    private getRefreshToken(data: any): string | undefined {
+        return this.resolvePath(data, this.responseMap.refreshTokenPath);
+    }
+
+    /** Extract user/identity object from auth response */
+    private getUserFromResponse(data: any): any {
+        return this.resolvePath(data, this.responseMap.userPath);
+    }
+
+    /** Extract error message from auth response */
+    private getErrorMessage(data: any, fallback: string): string {
+        const path = this.responseMap.errorMessagePath ?? 'message';
+        return this.resolvePath(data, path) || fallback;
+    }
+
+    /** Normalize a user/identity object into the standard User shape */
+    private normalizeUser(raw: any): User {
+        return {
+            user_id: raw.user_id ?? (raw.id ? this.hashUUID(raw.id) : 0),
+            id: raw.id ?? String(raw.user_id),
+            email: raw.email,
+            display_name: raw.display_name ?? raw.email?.split('@')[0] ?? '',
+            photo_url: raw.photo_url,
+            is_email_verified: raw.is_email_verified ?? false
+        };
+    }
+
     /**
      * Hash UUID to numeric ID for backward compatibility
      * Converts UUID string to a consistent numeric ID for legacy code
@@ -276,7 +338,7 @@ export class AuthService {
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include', // Include cookies for refresh token
+                    credentials: 'include',
                     body: JSON.stringify({
                         email,
                         password,
@@ -287,28 +349,24 @@ export class AuthService {
 
             const data = await response.json();
 
-            if (data.success && data.access_token) {
-                this.tokens.setAccessToken(data.access_token);
+            if (this.isAuthSuccess(data)) {
+                const accessToken = this.getAccessToken(data)!;
+                this.tokens.setAccessToken(accessToken);
                 this.signinStatus.setSigninStatus(true);
 
-                // Normalize user object to handle both response formats
-                const normalizedUser: User = {
-                    user_id: data.user.user_id ?? (data.user.id ? this.hashUUID(data.user.id) : 0),
-                    id: data.user.id ?? String(data.user.user_id),
-                    email: data.user.email,
-                    display_name: data.user.display_name ?? data.user.email.split('@')[0],
-                    photo_url: data.user.photo_url,
-                    is_email_verified: data.user.is_email_verified ?? false
-                };
+                const rawUser = this.getUserFromResponse(data);
+                if (rawUser) {
+                    const normalizedUser = this.normalizeUser(rawUser);
+                    this.updateUser(normalizedUser);
+                    return { success: true, user: normalizedUser };
+                }
 
-                this.updateUser(normalizedUser);
-
-                return { success: true, user: normalizedUser };
+                return { success: true };
             }
 
             return {
                 success: false,
-                message: data.message || 'Invalid credentials'
+                message: this.getErrorMessage(data, 'Invalid credentials')
             };
         } catch (error) {
             return {
@@ -421,17 +479,11 @@ export class AuthService {
                     this.tokens.setAccessToken(event.data.access_token);
                     this.signinStatus.setSigninStatus(true);
 
-                    // Normalize user object to handle both response formats
-                    const normalizedUser: User = {
-                        user_id: event.data.user.user_id ?? (event.data.user.id ? this.hashUUID(event.data.user.id) : 0),
-                        id: event.data.user.id ?? String(event.data.user.user_id),
-                        email: event.data.user.email,
-                        display_name: event.data.user.display_name ?? event.data.user.email.split('@')[0],
-                        photo_url: event.data.user.photo_url,
-                        is_email_verified: event.data.user.is_email_verified ?? false
-                    };
-
-                    this.updateUser(normalizedUser);
+                    const rawUser = event.data.user || this.getUserFromResponse(event.data);
+                    const normalizedUser = rawUser ? this.normalizeUser(rawUser) : undefined;
+                    if (normalizedUser) {
+                        this.updateUser(normalizedUser);
+                    }
 
                     window.removeEventListener('message', messageHandler);
                     popup.close();
@@ -499,32 +551,28 @@ export class AuthService {
 
             const data = await response.json();
 
-            if (data.success && data.access_token) {
-                this.tokens.setAccessToken(data.access_token);
+            if (this.isAuthSuccess(data)) {
+                const accessToken = this.getAccessToken(data)!;
+                this.tokens.setAccessToken(accessToken);
                 this.signinStatus.setSigninStatus(true);
 
-                // Normalize user object to handle both response formats
-                const normalizedUser: User = {
-                    user_id: data.user.user_id ?? (data.user.id ? this.hashUUID(data.user.id) : 0),
-                    id: data.user.id ?? String(data.user.user_id),
-                    email: data.user.email,
-                    display_name: data.user.display_name ?? data.user.email.split('@')[0],
-                    photo_url: data.user.photo_url,
-                    is_email_verified: data.user.is_email_verified ?? false
-                };
+                const rawUser = this.getUserFromResponse(data);
+                if (rawUser) {
+                    const normalizedUser = this.normalizeUser(rawUser);
+                    this.updateUser(normalizedUser);
+                    return {
+                        success: true,
+                        user: normalizedUser,
+                        message: data.needs_verification ? 'Please verify your email' : undefined
+                    };
+                }
 
-                this.updateUser(normalizedUser);
-
-                return {
-                    success: true,
-                    user: normalizedUser,
-                    message: data.needs_verification ? 'Please verify your email' : undefined
-                };
+                return { success: true };
             }
 
             return {
                 success: false,
-                message: data.message || 'Registration failed'
+                message: this.getErrorMessage(data, 'Registration failed')
             };
         } catch (error) {
             return {
@@ -594,20 +642,13 @@ export class AuthService {
 
             const data = await response.json();
 
-            if (data.access_token) {
-                this.tokens.setAccessToken(data.access_token);
+            const accessToken = this.getAccessToken(data) ?? data.access_token;
+            if (accessToken) {
+                this.tokens.setAccessToken(accessToken);
 
-                // Normalize user object to handle both response formats
-                if (data.user) {
-                    const normalizedUser: User = {
-                        user_id: data.user.user_id ?? (data.user.id ? this.hashUUID(data.user.id) : 0),
-                        id: data.user.id ?? String(data.user.user_id),
-                        email: data.user.email,
-                        display_name: data.user.display_name ?? data.user.email.split('@')[0],
-                        photo_url: data.user.photo_url,
-                        is_email_verified: data.user.is_email_verified ?? false
-                    };
-                    this.updateUser(normalizedUser);
+                const rawUser = this.getUserFromResponse(data) ?? data.user;
+                if (rawUser) {
+                    this.updateUser(this.normalizeUser(rawUser));
                 }
 
                 this.signinStatus.setSigninStatus(true);
@@ -687,20 +728,15 @@ export class AuthService {
 
             const result = await response.json();
 
-            if (result.success && result.access_token) {
-                this.tokens.setAccessToken(result.access_token);
-                this.signinStatus.setSigninStatus(true);
-                if (result.user) {
-                    // Normalize user object to handle both response formats
-                    const normalizedUser: User = {
-                        user_id: result.user.user_id ?? (result.user.id ? this.hashUUID(result.user.id) : 0),
-                        id: result.user.id ?? String(result.user.user_id),
-                        email: result.user.email,
-                        display_name: result.user.display_name ?? result.user.email.split('@')[0],
-                        photo_url: result.user.photo_url,
-                        is_email_verified: result.user.is_email_verified ?? false
-                    };
-                    this.updateUser(normalizedUser);
+            if (this.isAuthSuccess(result)) {
+                const accessToken = this.getAccessToken(result);
+                if (accessToken) {
+                    this.tokens.setAccessToken(accessToken);
+                    this.signinStatus.setSigninStatus(true);
+                }
+                const rawUser = this.getUserFromResponse(result);
+                if (rawUser) {
+                    this.updateUser(this.normalizeUser(rawUser));
                 }
             }
 
@@ -764,22 +800,13 @@ export class AuthService {
                 }
 
                 if (event.data.type === 'tenant_register_success') {
-                    // Set tokens and user
                     if (event.data.access_token) {
                         this.tokens.setAccessToken(event.data.access_token);
                         this.signinStatus.setSigninStatus(true);
                     }
-                    if (event.data.user) {
-                        // Normalize user object to handle both response formats
-                        const normalizedUser: User = {
-                            user_id: event.data.user.user_id ?? (event.data.user.id ? this.hashUUID(event.data.user.id) : 0),
-                            id: event.data.user.id ?? String(event.data.user.user_id),
-                            email: event.data.user.email,
-                            display_name: event.data.user.display_name ?? event.data.user.email.split('@')[0],
-                            photo_url: event.data.user.photo_url,
-                            is_email_verified: event.data.user.is_email_verified ?? false
-                        };
-                        this.updateUser(normalizedUser);
+                    const rawUser = event.data.user || this.getUserFromResponse(event.data);
+                    if (rawUser) {
+                        this.updateUser(this.normalizeUser(rawUser));
                     }
 
                     window.removeEventListener('message', messageHandler);
@@ -882,17 +909,18 @@ export class AuthService {
 
             const data = await response.json();
 
-            if (data.success && data.access_token) {
-                this.tokens.setAccessToken(data.access_token);
+            if (this.isAuthSuccess(data)) {
+                const accessToken = this.getAccessToken(data)!;
+                this.tokens.setAccessToken(accessToken);
                 return {
                     success: true,
-                    access_token: data.access_token
+                    access_token: accessToken
                 };
             }
 
             return {
                 success: false,
-                message: data.message || 'Failed to select tenant'
+                message: this.getErrorMessage(data, 'Failed to select tenant')
             };
         } catch (error) {
             return {

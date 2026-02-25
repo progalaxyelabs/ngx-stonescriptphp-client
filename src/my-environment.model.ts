@@ -72,6 +72,37 @@ export interface OAuthProviderConfig {
     };
 }
 
+/**
+ * Maps auth service response fields to expected locations.
+ * Different auth backends return tokens/user info in different structures.
+ * Paths use dot-notation (e.g., 'data.access_token' for nested fields).
+ *
+ * StoneScriptPHP format:  { status: 'ok', data: { access_token, user, ... } }
+ * Raw/external format:    { access_token, identity, ... }
+ */
+export interface AuthResponseMap {
+    /**
+     * Dot-path to check for success (e.g., 'status' for StoneScriptPHP).
+     * If omitted, success is determined by presence of accessToken.
+     */
+    successPath?: string;
+
+    /** Value that indicates success at successPath (e.g., 'ok') */
+    successValue?: string;
+
+    /** Dot-path to the access token (default: 'data.access_token') */
+    accessTokenPath: string;
+
+    /** Dot-path to the refresh token (default: 'data.refresh_token') */
+    refreshTokenPath: string;
+
+    /** Dot-path to the user/identity object (default: 'data.user') */
+    userPath: string;
+
+    /** Dot-path to error message (default: 'message') */
+    errorMessagePath?: string;
+}
+
 export class MyEnvironmentModel {
     production: boolean = true
 
@@ -181,6 +212,23 @@ export class MyEnvironmentModel {
      * ```
      */
     customProviders?: Record<string, OAuthProviderConfig>;
+
+    /**
+     * Auth response field mapping.
+     * Defaults to StoneScriptPHP format: { status: 'ok', data: { access_token, user, ... } }
+     *
+     * For external auth servers that return flat responses like
+     * { access_token, identity, ... }, override with:
+     * ```typescript
+     * authResponseMap: {
+     *   accessTokenPath: 'access_token',
+     *   refreshTokenPath: 'refresh_token',
+     *   userPath: 'identity',
+     *   errorMessagePath: 'message'
+     * }
+     * ```
+     */
+    authResponseMap?: AuthResponseMap;
 
     /**
      * Branding configuration for auth components
