@@ -725,7 +725,6 @@ export class TenantRegisterComponent implements OnInit {
         try {
             const result = await this.auth.registerTenant({
                 tenantName: this.tenantName,
-                tenantSlug: this.tenantSlug,
                 provider: provider
             });
 
@@ -759,7 +758,6 @@ export class TenantRegisterComponent implements OnInit {
         try {
             const result = await this.auth.registerTenant({
                 tenantName: this.tenantName,
-                tenantSlug: this.tenantSlug,
                 displayName: this.displayName,
                 email: this.email,
                 password: this.password,

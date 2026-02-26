@@ -10,38 +10,53 @@ export interface AuthConfig {
     mode: AuthMode;
 
     /**
-     * Token refresh endpoint path
+     * Auth server host for token refresh and all auth operations.
+     * Use this when auth is on a different server than the API.
+     * Replaces the deprecated accountsUrl and accountsServer fields.
+     * @example 'https://accounts.progalaxyelabs.com'
+     */
+    host?: string;
+
+    /**
+     * Token refresh endpoint path.
      * @default '/auth/refresh' for cookie mode, '/user/refresh_access' for body mode
      */
     refreshEndpoint?: string;
 
     /**
-     * Enable CSRF token support (required for cookie mode)
+     * Enable CSRF token support (required for cookie mode).
      * @default true for cookie mode, false for body mode
      */
     useCsrf?: boolean;
 
     /**
-     * Cookie name for refresh token
+     * Cookie name for refresh token.
      * @default 'refresh_token'
      */
     refreshTokenCookieName?: string;
 
     /**
-     * Cookie name for CSRF token
+     * Cookie name for CSRF token.
      * @default 'csrf_token'
      */
     csrfTokenCookieName?: string;
 
     /**
-     * CSRF header name
+     * CSRF header name.
      * @default 'X-CSRF-Token'
      */
     csrfHeaderName?: string;
+
+    /**
+     * Response field mapping for external auth compatibility.
+     * Defaults to StoneScriptPHP format: { status:'ok', data:{ access_token, user } }
+     * Replaces the deprecated top-level authResponseMap field.
+     */
+    responseMap?: Partial<AuthResponseMap>;
 }
 
 /**
- * Authentication server configuration
+ * Authentication server configuration (for multi-server mode via StoneScriptPHPAuth).
  */
 export interface AuthServerConfig {
     /** Server URL (e.g., 'https://accounts.progalaxyelabs.com') */
@@ -54,8 +69,6 @@ export interface AuthServerConfig {
 
 /**
  * Configuration for a custom OAuth provider.
- * Used to register custom providers via the ProviderRegistryService
- * or through the environment's customProviders field.
  */
 export interface OAuthProviderConfig {
     /** Display label for the provider (e.g., "Okta") */
@@ -74,7 +87,6 @@ export interface OAuthProviderConfig {
 
 /**
  * Maps auth service response fields to expected locations.
- * Different auth backends return tokens/user info in different structures.
  * Paths use dot-notation (e.g., 'data.access_token' for nested fields).
  *
  * StoneScriptPHP format:  { status: 'ok', data: { access_token, user, ... } }
@@ -107,55 +119,15 @@ export class MyEnvironmentModel {
     production: boolean = true
 
     /**
-     * Platform code identifier (e.g., 'progalaxy', 'hr', 'admin')
-     * Used for multi-tenant authentication
+     * Platform code identifier (e.g., 'progalaxy', 'hr', 'admin').
+     * Used for multi-tenant authentication.
      */
     platformCode: string = '';
 
     /**
-     * Accounts platform URL for centralized authentication (single-server mode)
-     * @example 'https://accounts.progalaxyelabs.com'
-     * @deprecated Use authServers for multi-server support
-     */
-    accountsUrl: string = '';
-
-    /**
-     * Multiple authentication servers configuration
-     * Enables platforms to authenticate against different identity providers
-     * @example
-     * ```typescript
-     * authServers: {
-     *   customer: { url: 'https://auth.progalaxyelabs.com', default: true },
-     *   employee: { url: 'https://admin-auth.progalaxyelabs.com' }
-     * }
-     * ```
-     */
-    authServers?: Record<string, AuthServerConfig>;
-
-    firebase: {
-        projectId: string
-        appId: string
-        databaseURL: string
-        storageBucket: string
-        locationId: string
-        apiKey: string
-        authDomain: string
-        messagingSenderId: string
-        measurementId: string
-    } = {
-            projectId: '',
-            appId: '',
-            databaseURL: '',
-            storageBucket: '',
-            locationId: '',
-            apiKey: '',
-            authDomain: '',
-            messagingSenderId: '',
-            measurementId: ''
-        }
-    /**
-     * Platform's own API base URL (e.g., '//api.medstoreapp.in')
-     * Used to route registration through the platform API proxy instead of auth directly
+     * Platform's own API base URL.
+     * Used for routes that go through the platform API proxy (e.g. register-tenant).
+     * Falls back to apiServer.host if not set.
      * @example '//api.medstoreapp.in'
      */
     apiUrl?: string;
@@ -163,23 +135,10 @@ export class MyEnvironmentModel {
     apiServer: {
         host: string
     } = { host: '' }
-    chatServer: {
-        host: string
-    } = { host: '' }
 
     /**
-     * Accounts/Authentication service server configuration
-     * Use this when auth is on a different server than the API
-     * Replaces the deprecated accountsUrl string with structured config
-     * @example { host: 'https://accounts.progalaxyelabs.com' }
-     */
-    accountsServer?: {
-        host: string
-    }
-
-    /**
-     * Files service server configuration
-     * Used by FilesService for file upload/download operations
+     * Files service server configuration.
+     * Used by FilesService for file upload/download operations.
      * @example { host: 'https://files.progalaxyelabs.com/api/' }
      */
     filesServer?: {
@@ -187,7 +146,7 @@ export class MyEnvironmentModel {
     }
 
     /**
-     * Authentication configuration
+     * Authentication configuration.
      * @default { mode: 'cookie', refreshEndpoint: '/auth/refresh', useCsrf: true }
      */
     auth?: AuthConfig = {
@@ -200,52 +159,59 @@ export class MyEnvironmentModel {
     };
 
     /**
+     * Multiple authentication servers configuration (for StoneScriptPHPAuth multi-server mode).
+     * @example
+     * ```typescript
+     * authServers: {
+     *   customer: { url: 'https://auth.progalaxyelabs.com', default: true },
+     *   employee: { url: 'https://admin-auth.progalaxyelabs.com' }
+     * }
+     * ```
+     */
+    authServers?: Record<string, AuthServerConfig>;
+
+    /**
      * Custom OAuth provider configurations.
-     * Register additional OAuth providers beyond the built-in ones
-     * (google, linkedin, apple, microsoft, github, zoho).
      * @example
      * ```typescript
      * customProviders: {
-     *   okta: { label: 'Sign in with Okta', cssClass: 'btn-okta', buttonStyle: { borderColor: '#007dc1' } },
-     *   keycloak: { label: 'Sign in with Keycloak', icon: '🔑' }
+     *   okta: { label: 'Sign in with Okta', cssClass: 'btn-okta', buttonStyle: { borderColor: '#007dc1' } }
      * }
      * ```
      */
     customProviders?: Record<string, OAuthProviderConfig>;
 
     /**
-     * Auth response field mapping.
-     * Defaults to StoneScriptPHP format: { status: 'ok', data: { access_token, user, ... } }
-     *
-     * For external auth servers that return flat responses like
-     * { access_token, identity, ... }, override with:
-     * ```typescript
-     * authResponseMap: {
-     *   accessTokenPath: 'access_token',
-     *   refreshTokenPath: 'refresh_token',
-     *   userPath: 'identity',
-     *   errorMessagePath: 'message'
-     * }
-     * ```
-     */
-    authResponseMap?: AuthResponseMap;
-
-    /**
-     * Branding configuration for auth components
-     * Allows platforms to customize login/register pages without creating wrappers
+     * Branding configuration for auth UI components.
      */
     branding?: {
-        /** Application name displayed on auth pages */
         appName: string;
-        /** URL to logo image */
         logo?: string;
-        /** Primary brand color (hex) */
         primaryColor?: string;
-        /** Gradient start color (hex) */
         gradientStart?: string;
-        /** Gradient end color (hex) */
         gradientEnd?: string;
-        /** Subtitle text displayed on auth pages */
         subtitle?: string;
     };
+
+    // ── Deprecated fields (kept for backward compatibility) ──────────────────
+
+    /**
+     * @deprecated Use auth.host instead.
+     * Auth server URL for centralized authentication.
+     */
+    accountsUrl: string = '';
+
+    /**
+     * @deprecated Use auth.host instead.
+     * Accounts/Authentication service server configuration.
+     */
+    accountsServer?: {
+        host: string
+    }
+
+    /**
+     * @deprecated Use auth.responseMap instead.
+     * Auth response field mapping for external auth compatibility.
+     */
+    authResponseMap?: AuthResponseMap;
 }

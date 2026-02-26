@@ -3,15 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, AuthProvider } from '../../auth.service';
 import { ProviderRegistryService } from '../../provider-registry.service';
+import { TenantMembership } from '../../auth.plugin';
 
-export interface TenantMembership {
-  tenant_id: string;
-  slug: string;
-  name: string;
-  role: string;
-  status: string;
-  last_accessed?: string;
-}
+export type { TenantMembership };
 
 export interface TenantSelectedEvent {
   tenantId: string;

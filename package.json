@@ -1,6 +1,6 @@
 {
   "name": "@progalaxyelabs/ngx-stonescriptphp-client",
-  "version": "1.11.1",
+  "version": "1.12.0",
   "description": "Angular client library for StoneScriptPHP backend framework",
   "keywords": [
     "angular",
