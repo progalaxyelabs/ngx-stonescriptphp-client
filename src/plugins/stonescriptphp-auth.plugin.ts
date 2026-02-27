@@ -441,7 +441,7 @@ export class StoneScriptPHPAuth implements AuthPlugin {
         }
     }
 
-    async registerTenant(data: RegisterTenantData, accessToken?: string): Promise<any> {
+    async registerTenant(data: RegisterTenantData): Promise<AuthResult> {
         if (data.provider !== 'emailPassword') {
             return this.registerTenantWithOAuth(data.tenantName, data.provider);
         }
@@ -458,14 +458,15 @@ export class StoneScriptPHPAuth implements AuthPlugin {
             if (data.role) body['role'] = data.role;
             const response = await fetch(`${apiUrl}/auth/register-tenant`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-                },
+                headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify(body)
             });
-            return response.json();
+            const result = await response.json();
+            if (result?.status === 'ok' || result?.success === true) {
+                return { success: true };
+            }
+            return { success: false, message: result?.data?.message || result?.message || 'Registration failed' };
         } catch {
             return { success: false, message: 'Network error. Please try again.' };
         }
@@ -474,7 +475,7 @@ export class StoneScriptPHPAuth implements AuthPlugin {
     private async registerTenantWithOAuth(
         tenantName: string,
         provider: string
-    ): Promise<any> {
+    ): Promise<AuthResult> {
         return new Promise((resolve) => {
             const width = 500, height = 600;
             const left = (window.screen.width - width) / 2;
@@ -499,8 +500,11 @@ export class StoneScriptPHPAuth implements AuthPlugin {
                 if (event.data.type === 'tenant_register_success') {
                     window.removeEventListener('message', messageHandler);
                     popup.close();
-                    resolve({ success: true, tenant: event.data.tenant, user: event.data.user,
-                        access_token: event.data.access_token });
+                    resolve({
+                        success: true,
+                        accessToken: event.data.access_token,
+                        user: event.data.user ? this.normalizeUser(event.data.user) : undefined
+                    });
                 } else if (event.data.type === 'tenant_register_error') {
                     window.removeEventListener('message', messageHandler);
                     popup.close();

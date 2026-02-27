@@ -197,20 +197,27 @@ export class AuthService {
         provider: AuthProvider;
         role?: string;
         countryCode?: string;
-    }): Promise<any> {
+    }): Promise<AuthResult> {
         if (!this.plugin.registerTenant) {
             return { success: false, message: 'registerTenant not supported by the configured auth plugin' };
         }
-        const accessToken = this.tokens.getAccessToken() || undefined;
-        const result = await this.plugin.registerTenant(data as RegisterTenantData, accessToken);
-        if (result?.access_token) {
-            this.tokens.setAccessToken(result.access_token);
-            this.signinStatus.setSigninStatus(true);
+
+        const registered = await this.plugin.registerTenant(data as RegisterTenantData);
+        if (!registered.success) return registered;
+
+        // OAuth: token comes directly from the popup — store it and we're done.
+        if (registered.accessToken) {
+            this.storeAuthResult(registered);
+            return registered;
         }
-        if (result?.refresh_token) {
-            this.tokens.setRefreshToken(result.refresh_token);
+
+        // emailPassword: registration succeeded but no token yet.
+        // Login via auth (SSO) to obtain tokens.
+        if (data.provider === 'emailPassword' && data.email && data.password) {
+            return await this.loginWithEmail(data.email, data.password);
         }
-        return result;
+
+        return registered;
     }
 
     async getTenantMemberships(serverName?: string): Promise<{ memberships: TenantMembership[] }> {

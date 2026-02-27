@@ -5,8 +5,7 @@ import { AuthService, AuthProvider } from '../../auth.service';
 import { ProviderRegistryService } from '../../provider-registry.service';
 
 export interface TenantCreatedEvent {
-  tenant: { id: string; name: string; slug: string };
-  user: { id: string; email: string; name: string };
+  user: { id: string; email: string; display_name: string };
 }
 
 @Component({
@@ -728,12 +727,9 @@ export class TenantRegisterComponent implements OnInit {
                 provider: provider
             });
 
-            if (result.success && result.tenant && result.user) {
+            if (result.success && result.user) {
                 this.success = 'Organization created successfully!';
-                this.tenantCreated.emit({
-                    tenant: result.tenant,
-                    user: result.user
-                });
+                this.tenantCreated.emit({ user: result.user });
             } else {
                 this.error = result.message || 'Registration failed';
             }
@@ -764,12 +760,9 @@ export class TenantRegisterComponent implements OnInit {
                 provider: 'emailPassword'
             });
 
-            if (result.success && result.tenant && result.user) {
+            if (result.success && result.user) {
                 this.success = 'Organization created successfully!';
-                this.tenantCreated.emit({
-                    tenant: result.tenant,
-                    user: result.user
-                });
+                this.tenantCreated.emit({ user: result.user });
             } else {
                 this.error = result.message || 'Registration failed';
             }

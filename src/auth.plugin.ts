@@ -112,7 +112,7 @@ export interface AuthPlugin {
     getTenantMemberships?(accessToken: string): Promise<TenantMembership[]>;
 
     /** Register a new tenant (organization) */
-    registerTenant?(data: RegisterTenantData, accessToken?: string): Promise<any>;
+    registerTenant?(data: RegisterTenantData): Promise<AuthResult>;
 
     /** Check if a tenant slug is available */
     checkTenantSlugAvailable?(slug: string): Promise<{ available: boolean; suggestion?: string }>;
