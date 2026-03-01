@@ -3,8 +3,8 @@ import { InjectionToken } from '@angular/core';
 export const AUTH_PLUGIN = new InjectionToken<AuthPlugin>('AUTH_PLUGIN');
 
 export interface User {
-    user_id: number;           // Always provided (legacy platforms or hashed UUID)
-    id: string;                // Always provided (new auth system UUID or stringified user_id)
+    user_id?: number;          // Optional - not present in new auth responses (post-cleanup)
+    id?: string;               // Optional - not present in new auth responses (post-cleanup)
     email: string;
     display_name: string;      // Always provided (fallback to email prefix if missing)
     photo_url?: string;
@@ -20,6 +20,8 @@ export interface AuthResult {
     /** Set by the plugin for body mode — AuthService stores it in TokenService */
     refreshToken?: string;
     needsVerification?: boolean;
+    /** Membership returned directly by the login response (avoids extra API call) */
+    membership?: TenantMembership;
 }
 
 export interface TenantMembership {

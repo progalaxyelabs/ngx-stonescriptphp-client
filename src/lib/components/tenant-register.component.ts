@@ -5,7 +5,7 @@ import { AuthService, AuthProvider } from '../../auth.service';
 import { ProviderRegistryService } from '../../provider-registry.service';
 
 export interface TenantCreatedEvent {
-  user: { id: string; email: string; display_name: string };
+  user: { id?: string; email: string; display_name: string };
 }
 
 @Component({
