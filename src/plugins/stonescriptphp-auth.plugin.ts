@@ -97,20 +97,36 @@ export class StoneScriptPHPAuth implements AuthPlugin {
         return raw ? this.normalizeUser(raw) : undefined;
     }
 
+    private resolveMembership(data: any): TenantMembership | undefined {
+        const raw = this.resolvePath(data, 'data.membership');
+        return raw ? raw as TenantMembership : undefined;
+    }
+
     private resolveErrorMessage(data: any, fallback: string): string {
         const path = this.responseMap.errorMessagePath ?? 'message';
         return this.resolvePath(data, path) || fallback;
     }
 
     private normalizeUser(raw: any): User {
-        return {
-            user_id: raw.user_id ?? (raw.id ? this.hashUUID(raw.id) : 0),
-            id: raw.id ?? String(raw.user_id),
+        const user: User = {
             email: raw.email,
             display_name: raw.display_name ?? raw.email?.split('@')[0] ?? '',
             photo_url: raw.photo_url,
             is_email_verified: raw.is_email_verified ?? false
         };
+        // id and user_id are optional after auth response cleanup (task #1552)
+        // Only populate them if the raw data contains them
+        if (raw.id) {
+            user.id = raw.id;
+        } else if (raw.user_id) {
+            user.id = String(raw.user_id);
+        }
+        if (raw.user_id) {
+            user.user_id = raw.user_id;
+        } else if (raw.id) {
+            user.user_id = this.hashUUID(raw.id);
+        }
+        return user;
     }
 
     private hashUUID(uuid: string): number {
@@ -212,7 +228,8 @@ export class StoneScriptPHPAuth implements AuthPlugin {
                     success: true,
                     accessToken: this.resolveAccessToken(data),
                     refreshToken: this.resolveRefreshToken(data),
-                    user: this.resolveUser(data)
+                    user: this.resolveUser(data),
+                    membership: this.resolveMembership(data)
                 };
             }
             return { success: false, message: this.resolveErrorMessage(data, 'Invalid credentials') };
@@ -426,7 +443,8 @@ export class StoneScriptPHPAuth implements AuthPlugin {
     async getTenantMemberships(accessToken: string): Promise<TenantMembership[]> {
         try {
             const accountsUrl = this.getAccountsUrl();
-            const response = await fetch(`${accountsUrl}/api/auth/memberships`, {
+            const platformCode = encodeURIComponent(this.config.platformCode ?? '');
+            const response = await fetch(`${accountsUrl}/api/auth/memberships?platform_code=${platformCode}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,

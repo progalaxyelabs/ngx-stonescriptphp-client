@@ -1,7 +1,7 @@
 import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService, AuthProvider } from '../../auth.service';
+import { AuthService, AuthProvider, AuthResult } from '../../auth.service';
 import { ProviderRegistryService } from '../../provider-registry.service';
 import { TenantMembership } from '../../auth.plugin';
 
@@ -636,8 +636,8 @@ export class TenantLoginComponent implements OnInit {
                 return;
             }
 
-            // Authentication successful, now handle tenant selection
-            await this.handlePostAuthFlow();
+            // Authentication successful — pass result so membership can be reused
+            await this.handlePostAuthFlow(result);
         } catch (err: any) {
             this.error = err.message || 'An unexpected error occurred';
         } finally {
@@ -657,8 +657,8 @@ export class TenantLoginComponent implements OnInit {
                 return;
             }
 
-            // Authentication successful, now handle tenant selection
-            await this.handlePostAuthFlow();
+            // Authentication successful — pass result so membership can be reused if present
+            await this.handlePostAuthFlow(result);
         } catch (err: any) {
             this.error = err.message || 'An unexpected error occurred';
         } finally {
@@ -666,7 +666,7 @@ export class TenantLoginComponent implements OnInit {
         }
     }
 
-    async handlePostAuthFlow() {
+    async handlePostAuthFlow(loginResult?: AuthResult) {
         if (!this.showTenantSelector) {
             // Tenant selection is disabled, emit event immediately
             this.tenantSelected.emit({
@@ -677,13 +677,22 @@ export class TenantLoginComponent implements OnInit {
             return;
         }
 
-        // Fetch user's tenant memberships
+        // Resolve memberships — prefer data from login response to avoid extra API call
         this.loading = true;
 
         try {
-            const result = await this.auth.getTenantMemberships();
+            let memberships: TenantMembership[];
 
-            if (!result.memberships || result.memberships.length === 0) {
+            if (loginResult?.membership) {
+                // Login response already included membership — use it directly
+                memberships = [loginResult.membership];
+            } else {
+                // Fall back to fetching memberships from API (with platform_code param)
+                const result = await this.auth.getTenantMemberships();
+                memberships = result.memberships;
+            }
+
+            if (!memberships || memberships.length === 0) {
                 // User has no tenants, prompt to create one
                 this.error = 'You are not a member of any organization. Please create one.';
                 if (this.allowTenantCreation) {
@@ -692,7 +701,7 @@ export class TenantLoginComponent implements OnInit {
                 return;
             }
 
-            this.memberships = result.memberships;
+            this.memberships = memberships;
 
             // Get user name if available
             const currentUser = this.auth.getCurrentUser();
