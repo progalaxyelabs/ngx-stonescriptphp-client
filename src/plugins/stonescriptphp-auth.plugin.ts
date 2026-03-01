@@ -385,21 +385,45 @@ export class StoneScriptPHPAuth implements AuthPlugin {
                 return;
             }
 
+            const cleanup = () => {
+                window.removeEventListener('message', messageHandler);
+                clearInterval(checkClosed);
+                if (popup && !popup.closed) popup.close();
+            };
+
             const messageHandler = (event: MessageEvent) => {
                 if (event.origin !== new URL(accountsUrl).origin) return;
 
-                if (event.data.type === 'oauth_success') {
-                    window.removeEventListener('message', messageHandler);
-                    popup.close();
+                if (event.data.type === 'oauth_new_identity') {
+                    cleanup();
+                    resolve({
+                        success: true,
+                        accessToken: event.data.access_token,
+                        refreshToken: event.data.refresh_token,
+                        isNewIdentity: true,
+                        authMethod: event.data.auth_method,
+                        oauthProvider: event.data.oauth_provider,
+                        identity: event.data.identity,
+                    });
+                } else if (event.data.type === 'oauth_success') {
+                    cleanup();
                     const rawUser = event.data.user || this.resolveUser(event.data);
                     resolve({
                         success: true,
                         accessToken: event.data.access_token,
-                        user: rawUser ? this.normalizeUser(rawUser) : undefined
+                        refreshToken: event.data.refresh_token,
+                        user: rawUser ? this.normalizeUser(rawUser) : undefined,
+                        membership: event.data.membership,
+                    });
+                } else if (event.data.type === 'oauth_tenant_selection') {
+                    cleanup();
+                    resolve({
+                        success: true,
+                        accessToken: event.data.selection_token,
+                        memberships: event.data.memberships,
                     });
                 } else if (event.data.type === 'oauth_error') {
-                    window.removeEventListener('message', messageHandler);
-                    popup.close();
+                    cleanup();
                     resolve({ success: false, message: event.data.message || 'OAuth login failed' });
                 }
             };
@@ -587,6 +611,27 @@ export class StoneScriptPHPAuth implements AuthPlugin {
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.message || 'Failed to create tenant');
+        }
+        return response.json();
+    }
+
+    async provisionTenant(storeName: string, countryCode: string, accessToken: string): Promise<any> {
+        const apiUrl = this.getPlatformApiUrl();
+        const response = await fetch(`${apiUrl}/auth/provision-tenant`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                store_name: storeName,
+                country_code: countryCode,
+            })
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to provision tenant');
         }
         return response.json();
     }

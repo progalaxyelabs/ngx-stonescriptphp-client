@@ -22,6 +22,16 @@ export interface AuthResult {
     needsVerification?: boolean;
     /** Membership returned directly by the login response (avoids extra API call) */
     membership?: TenantMembership;
+    /** True when the user is new (has identity but no tenant membership) */
+    isNewIdentity?: boolean;
+    /** Auth method used (e.g., 'oauth', 'emailPassword') */
+    authMethod?: string;
+    /** OAuth provider used (e.g., 'google') */
+    oauthProvider?: string;
+    /** Identity info for new users (used with isNewIdentity) */
+    identity?: { email: string; display_name?: string; picture?: string };
+    /** Multiple tenant memberships for tenant selection flow */
+    memberships?: TenantMembership[];
 }
 
 export interface TenantMembership {
@@ -127,6 +137,9 @@ export interface AuthPlugin {
 
     /** Check if user email exists */
     checkEmail?(email: string): Promise<{ exists: boolean; user?: any }>;
+
+    /** Provision a new tenant for an authenticated user (post-onboarding) */
+    provisionTenant?(storeName: string, countryCode: string, accessToken: string): Promise<any>;
 
     // ── Multi-server (implemented by StoneScriptPHPAuth) ──────────────────────
 

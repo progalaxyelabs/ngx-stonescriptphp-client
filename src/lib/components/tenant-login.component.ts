@@ -13,6 +13,17 @@ export interface TenantSelectedEvent {
   role: string;
 }
 
+export interface OnboardingNeededEvent {
+  auth_method: string;
+  oauth_provider?: string;
+  is_new_identity: boolean;
+  identity: {
+    email: string;
+    display_name?: string;
+    picture?: string;
+  };
+}
+
 @Component({
     selector: 'lib-tenant-login',
     standalone: true,
@@ -549,6 +560,7 @@ export class TenantLoginComponent implements OnInit {
 
     // Outputs
     @Output() tenantSelected = new EventEmitter<TenantSelectedEvent>();
+    @Output() needsOnboarding = new EventEmitter<OnboardingNeededEvent>();
     @Output() createTenant = new EventEmitter<void>();
 
     // Form Fields
@@ -657,7 +669,25 @@ export class TenantLoginComponent implements OnInit {
                 return;
             }
 
-            // Authentication successful — pass result so membership can be reused if present
+            // New identity — user exists but has no tenant membership
+            if (result.isNewIdentity && result.identity) {
+                this.needsOnboarding.emit({
+                    auth_method: result.authMethod || 'oauth',
+                    oauth_provider: result.oauthProvider,
+                    is_new_identity: true,
+                    identity: result.identity,
+                });
+                return;
+            }
+
+            // Multi-tenant selection — user has multiple memberships
+            if (result.memberships && result.memberships.length > 0) {
+                this.memberships = result.memberships;
+                this.showingTenantSelector = true;
+                return;
+            }
+
+            // Standard success — pass result so membership can be reused if present
             await this.handlePostAuthFlow(result);
         } catch (err: any) {
             this.error = err.message || 'An unexpected error occurred';

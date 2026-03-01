@@ -254,6 +254,20 @@ export class AuthService {
         return this.plugin.checkOnboardingStatus(identityId);
     }
 
+    async provisionTenant(storeName: string, countryCode: string = 'IN'): Promise<any> {
+        if (!this.plugin.provisionTenant) {
+            throw new Error('provisionTenant not supported by the configured auth plugin');
+        }
+        const result = await this.plugin.provisionTenant(
+            storeName, countryCode, this.tokens.getAccessToken()
+        );
+        if (result?.access_token) {
+            this.tokens.setAccessToken(result.access_token);
+            this.signinStatus.setSigninStatus(true);
+        }
+        return result;
+    }
+
     async completeTenantOnboarding(countryCode: string, tenantName: string, serverName?: string): Promise<any> {
         if (!this.plugin.completeTenantOnboarding) throw new Error('completeTenantOnboarding not supported');
         const result = await this.plugin.completeTenantOnboarding(

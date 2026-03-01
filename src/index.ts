@@ -40,5 +40,5 @@ export type { OAuthProviderConfig } from './my-environment.model';
 export { VerifyStatus } from './signin-status.service';
 
 // ── Multi-tenant types ────────────────────────────────────────────────────────
-export type { TenantSelectedEvent } from './lib/components/tenant-login.component';
+export type { TenantSelectedEvent, OnboardingNeededEvent } from './lib/components/tenant-login.component';
 export type { TenantCreatedEvent } from './lib/components/tenant-register.component';
