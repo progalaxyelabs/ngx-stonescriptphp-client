@@ -43,16 +43,6 @@ export interface TenantMembership {
     last_accessed?: string;
 }
 
-export interface RegisterTenantData {
-    tenantName: string;
-    displayName?: string;
-    email?: string;
-    password?: string;
-    provider: string;
-    role?: string; // 'owner' for store creation, 'cashier' etc. for employee addition
-    countryCode?: string; // optional, defaults to 'IN' on auth service
-}
-
 /**
  * Auth plugin interface — implement this to support any auth backend.
  *
@@ -123,23 +113,14 @@ export interface AuthPlugin {
     /** List tenant memberships for the authenticated user */
     getTenantMemberships?(accessToken: string): Promise<TenantMembership[]>;
 
-    /** Register a new tenant (organization) */
-    registerTenant?(data: RegisterTenantData): Promise<AuthResult>;
-
     /** Check if a tenant slug is available */
     checkTenantSlugAvailable?(slug: string): Promise<{ available: boolean; suggestion?: string }>;
 
     /** Check onboarding status for a user identity */
     checkOnboardingStatus?(identityId: string, platformCode?: string): Promise<any>;
 
-    /** Complete tenant onboarding (create tenant with country + org name) */
-    completeTenantOnboarding?(countryCode: string, tenantName: string, accessToken: string): Promise<any>;
-
     /** Check if user email exists */
     checkEmail?(email: string): Promise<{ exists: boolean; user?: any }>;
-
-    /** Provision a new tenant for an authenticated user (post-onboarding) */
-    provisionTenant?(storeName: string, countryCode: string, accessToken: string): Promise<any>;
 
     // ── Multi-server (implemented by StoneScriptPHPAuth) ──────────────────────
 

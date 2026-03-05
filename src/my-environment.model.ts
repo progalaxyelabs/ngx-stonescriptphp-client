@@ -124,14 +124,6 @@ export class MyEnvironmentModel {
      */
     platformCode: string = '';
 
-    /**
-     * Platform's own API base URL.
-     * Used for routes that go through the platform API proxy (e.g. register-tenant).
-     * Falls back to apiServer.host if not set.
-     * @example '//api.medstoreapp.in'
-     */
-    apiUrl?: string;
-
     apiServer: {
         host: string
     } = { host: '' }
@@ -142,6 +134,15 @@ export class MyEnvironmentModel {
      * @example { host: 'https://files.progalaxyelabs.com/api/' }
      */
     filesServer?: {
+        host: string
+    }
+
+    /**
+     * Chat service server configuration.
+     * Used by Angular portals to establish authenticated WebSocket connections.
+     * @example { host: 'wss://chat.progalaxyelabs.com' }
+     */
+    chatServer?: {
         host: string
     }
 

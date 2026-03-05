@@ -8,6 +8,15 @@ export interface TenantCreatedEvent {
   user: { id?: string; email: string; display_name: string };
 }
 
+export interface TenantRegisterRequestEvent {
+  tenantName: string;
+  tenantSlug: string;
+  displayName?: string;
+  email?: string;
+  password?: string;
+  provider: string;
+}
+
 @Component({
     selector: 'lib-tenant-register',
     standalone: true,
@@ -566,6 +575,7 @@ export class TenantRegisterComponent implements OnInit {
 
     // Outputs
     @Output() tenantCreated = new EventEmitter<TenantCreatedEvent>();
+    @Output() registerRequested = new EventEmitter<TenantRegisterRequestEvent>();
     @Output() navigateToLogin = new EventEmitter<void>();
 
     // Form Fields
@@ -711,65 +721,52 @@ export class TenantRegisterComponent implements OnInit {
         return true;
     }
 
-    async onOAuthRegister(provider: AuthProvider) {
+    onOAuthRegister(provider: AuthProvider) {
         if (!this.isFormValid()) {
             this.error = 'Please complete the organization information';
             return;
         }
 
-        this.loading = true;
-        this.loadingText = `Signing up with ${provider}...`;
         this.error = '';
-
-        try {
-            const result = await this.auth.registerTenant({
-                tenantName: this.tenantName,
-                provider: provider
-            });
-
-            if (result.success && result.user) {
-                this.success = 'Organization created successfully!';
-                this.tenantCreated.emit({ user: result.user });
-            } else {
-                this.error = result.message || 'Registration failed';
-            }
-        } catch (err: any) {
-            this.error = err.message || 'An unexpected error occurred';
-        } finally {
-            this.loading = false;
-        }
+        this.registerRequested.emit({
+            tenantName: this.tenantName,
+            tenantSlug: this.tenantSlug,
+            provider: provider
+        });
     }
 
-    async onRegister() {
+    onRegister() {
         if (!this.isFormValid()) {
             this.error = 'Please fill in all required fields correctly';
             return;
         }
 
-        this.loading = true;
-        this.loadingText = 'Creating your organization...';
         this.error = '';
         this.success = '';
+        this.registerRequested.emit({
+            tenantName: this.tenantName,
+            tenantSlug: this.tenantSlug,
+            displayName: this.displayName,
+            email: this.email,
+            password: this.password,
+            provider: 'emailPassword'
+        });
+    }
 
-        try {
-            const result = await this.auth.registerTenant({
-                tenantName: this.tenantName,
-                displayName: this.displayName,
-                email: this.email,
-                password: this.password,
-                provider: 'emailPassword'
-            });
+    /** Call from consuming component after handling registerRequested to show loading state */
+    setLoading(loading: boolean, text?: string) {
+        this.loading = loading;
+        if (text) this.loadingText = text;
+    }
 
-            if (result.success && result.user) {
-                this.success = 'Organization created successfully!';
-                this.tenantCreated.emit({ user: result.user });
-            } else {
-                this.error = result.message || 'Registration failed';
-            }
-        } catch (err: any) {
-            this.error = err.message || 'An unexpected error occurred';
-        } finally {
-            this.loading = false;
+    /** Call from consuming component to show success/error after handling registerRequested */
+    setResult(result: { success: boolean; message?: string; user?: any }) {
+        this.loading = false;
+        if (result.success && result.user) {
+            this.success = 'Organization created successfully!';
+            this.tenantCreated.emit({ user: result.user });
+        } else if (!result.success) {
+            this.error = result.message || 'Registration failed';
         }
     }
 

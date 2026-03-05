@@ -41,4 +41,4 @@ export { VerifyStatus } from './signin-status.service';
 
 // ── Multi-tenant types ────────────────────────────────────────────────────────
 export type { TenantSelectedEvent, OnboardingNeededEvent } from './lib/components/tenant-login.component';
-export type { TenantCreatedEvent } from './lib/components/tenant-register.component';
+export type { TenantCreatedEvent, TenantRegisterRequestEvent } from './lib/components/tenant-register.component';

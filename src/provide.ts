@@ -51,8 +51,7 @@ export function provideNgxStoneScriptPhpClient(
         platformCode: environment.platformCode,
         authServers: environment.authServers,
         responseMap: environment.auth?.responseMap ?? environment.authResponseMap,
-        auth: environment.auth,
-        apiUrl: environment.apiUrl
+        auth: environment.auth
     });
 
     return makeEnvironmentProviders([

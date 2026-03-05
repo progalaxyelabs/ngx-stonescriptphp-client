@@ -2,10 +2,10 @@ import { Injectable, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
-import { AUTH_PLUGIN, AuthPlugin, AuthResult, TenantMembership, RegisterTenantData, User } from './auth.plugin';
+import { AUTH_PLUGIN, AuthPlugin, AuthResult, TenantMembership, User } from './auth.plugin';
 
 // Re-export types for backward compatibility
-export type { AuthResult, TenantMembership, RegisterTenantData, User };
+export type { AuthResult, TenantMembership, User };
 export type { AuthPlugin };
 
 export type BuiltInProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'zoho' | 'emailPassword';
@@ -189,37 +189,6 @@ export class AuthService {
 
     // ── Multi-tenant operations ───────────────────────────────────────────────
 
-    async registerTenant(data: {
-        tenantName: string;
-        displayName?: string;
-        email?: string;
-        password?: string;
-        provider: AuthProvider;
-        role?: string;
-        countryCode?: string;
-    }): Promise<AuthResult> {
-        if (!this.plugin.registerTenant) {
-            return { success: false, message: 'registerTenant not supported by the configured auth plugin' };
-        }
-
-        const registered = await this.plugin.registerTenant(data as RegisterTenantData);
-        if (!registered.success) return registered;
-
-        // OAuth: token comes directly from the popup — store it and we're done.
-        if (registered.accessToken) {
-            this.storeAuthResult(registered);
-            return registered;
-        }
-
-        // emailPassword: registration succeeded but no token yet.
-        // Login via auth (SSO) to obtain tokens.
-        if (data.provider === 'emailPassword' && data.email && data.password) {
-            return await this.loginWithEmail(data.email, data.password);
-        }
-
-        return registered;
-    }
-
     async getTenantMemberships(serverName?: string): Promise<{ memberships: TenantMembership[] }> {
         if (!this.plugin.getTenantMemberships) return { memberships: [] };
         const memberships = await this.plugin.getTenantMemberships(this.tokens.getAccessToken());
@@ -252,32 +221,6 @@ export class AuthService {
     async checkOnboardingStatus(identityId: string, serverName?: string): Promise<any> {
         if (!this.plugin.checkOnboardingStatus) throw new Error('checkOnboardingStatus not supported');
         return this.plugin.checkOnboardingStatus(identityId);
-    }
-
-    async provisionTenant(storeName: string, countryCode: string = 'IN'): Promise<any> {
-        if (!this.plugin.provisionTenant) {
-            throw new Error('provisionTenant not supported by the configured auth plugin');
-        }
-        const result = await this.plugin.provisionTenant(
-            storeName, countryCode, this.tokens.getAccessToken()
-        );
-        if (result?.access_token) {
-            this.tokens.setAccessToken(result.access_token);
-            this.signinStatus.setSigninStatus(true);
-        }
-        return result;
-    }
-
-    async completeTenantOnboarding(countryCode: string, tenantName: string, serverName?: string): Promise<any> {
-        if (!this.plugin.completeTenantOnboarding) throw new Error('completeTenantOnboarding not supported');
-        const result = await this.plugin.completeTenantOnboarding(
-            countryCode, tenantName, this.tokens.getAccessToken()
-        );
-        if (result?.access_token) {
-            this.tokens.setAccessToken(result.access_token);
-            this.signinStatus.setSigninStatus(true);
-        }
-        return result;
     }
 
     // ── Multi-server (delegated to plugin) ────────────────────────────────────

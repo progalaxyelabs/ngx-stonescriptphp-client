@@ -1,4 +1,4 @@
-import { AuthPlugin, AuthResult, TenantMembership, RegisterTenantData, User } from '../auth.plugin';
+import { AuthPlugin, AuthResult, TenantMembership, User } from '../auth.plugin';
 import { AuthResponseMap, AuthConfig, AuthServerConfig } from '../my-environment.model';
 
 export interface StoneScriptPHPAuthConfig {
@@ -26,11 +26,6 @@ export interface StoneScriptPHPAuthConfig {
      */
     auth?: Pick<AuthConfig, 'mode' | 'refreshEndpoint' | 'useCsrf' | 'csrfTokenCookieName' | 'csrfHeaderName'>;
 
-    /**
-     * Platform's own API URL for register-tenant proxy route.
-     * Falls back to host if not set.
-     */
-    apiUrl?: string;
 }
 
 const ACTIVE_SERVER_KEY = 'progalaxyapi_active_auth_server';
@@ -162,10 +157,6 @@ export class StoneScriptPHPAuth implements AuthPlugin {
             return serverConfig.url;
         }
         return this.config.host;
-    }
-
-    private getPlatformApiUrl(): string {
-        return this.config.apiUrl || this.config.host;
     }
 
     private getDefaultServer(): string | null {
@@ -483,89 +474,6 @@ export class StoneScriptPHPAuth implements AuthPlugin {
         }
     }
 
-    async registerTenant(data: RegisterTenantData): Promise<AuthResult> {
-        if (data.provider !== 'emailPassword') {
-            return this.registerTenantWithOAuth(data.tenantName, data.provider);
-        }
-        try {
-            const apiUrl = this.getPlatformApiUrl();
-            const body: Record<string, string> = {
-                tenant_name: data.tenantName,
-                email: data.email ?? '',
-                password: data.password ?? '',
-                provider: 'emailPassword'
-            };
-            if (data.displayName) body['display_name'] = data.displayName;
-            if (data.countryCode) body['country_code'] = data.countryCode;
-            if (data.role) body['role'] = data.role;
-            const response = await fetch(`${apiUrl}/auth/register-tenant`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(body)
-            });
-            const result = await response.json();
-            if (result?.status === 'ok' || result?.success === true) {
-                return { success: true };
-            }
-            return { success: false, message: result?.data?.message || result?.message || 'Registration failed' };
-        } catch {
-            return { success: false, message: 'Network error. Please try again.' };
-        }
-    }
-
-    private async registerTenantWithOAuth(
-        tenantName: string,
-        provider: string
-    ): Promise<AuthResult> {
-        return new Promise((resolve) => {
-            const width = 500, height = 600;
-            const left = (window.screen.width - width) / 2;
-            const top = (window.screen.height - height) / 2;
-
-            const accountsUrl = this.getAccountsUrl();
-            const oauthUrl = `${accountsUrl}/oauth/${provider}?` +
-                `platform=${this.config.platformCode}&mode=popup&action=register_tenant&` +
-                `tenant_name=${encodeURIComponent(tenantName)}`;
-
-            const popup = window.open(oauthUrl, `${provider}_register_tenant`,
-                `width=${width},height=${height},left=${left},top=${top}`);
-
-            if (!popup) {
-                resolve({ success: false, message: 'Popup blocked. Please allow popups for this site.' });
-                return;
-            }
-
-            const messageHandler = (event: MessageEvent) => {
-                if (event.origin !== new URL(accountsUrl).origin) return;
-
-                if (event.data.type === 'tenant_register_success') {
-                    window.removeEventListener('message', messageHandler);
-                    popup.close();
-                    resolve({
-                        success: true,
-                        accessToken: event.data.access_token,
-                        user: event.data.user ? this.normalizeUser(event.data.user) : undefined
-                    });
-                } else if (event.data.type === 'tenant_register_error') {
-                    window.removeEventListener('message', messageHandler);
-                    popup.close();
-                    resolve({ success: false, message: event.data.message || 'Tenant registration failed' });
-                }
-            };
-
-            window.addEventListener('message', messageHandler);
-
-            const checkClosed = setInterval(() => {
-                if (popup.closed) {
-                    clearInterval(checkClosed);
-                    window.removeEventListener('message', messageHandler);
-                    resolve({ success: false, message: 'Registration cancelled' });
-                }
-            }, 500);
-        });
-    }
-
     async checkTenantSlugAvailable(slug: string): Promise<{ available: boolean; suggestion?: string }> {
         try {
             const accountsUrl = this.getAccountsUrl();
@@ -588,51 +496,6 @@ export class StoneScriptPHPAuth implements AuthPlugin {
             { method: 'GET', headers: { 'Content-Type': 'application/json' }, credentials: 'include' }
         );
         if (!response.ok) throw new Error('Failed to check onboarding status');
-        return response.json();
-    }
-
-    async completeTenantOnboarding(countryCode: string, tenantName: string, accessToken: string): Promise<any> {
-        const apiUrl = this.getPlatformApiUrl();
-        const response = await fetch(`${apiUrl}/auth/register-tenant`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-                platform: this.config.platformCode,
-                tenant_name: tenantName,
-                country_code: countryCode,
-                provider: 'google',
-                oauth_token: accessToken
-            })
-        });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to create tenant');
-        }
-        return response.json();
-    }
-
-    async provisionTenant(storeName: string, countryCode: string, accessToken: string): Promise<any> {
-        const apiUrl = this.getPlatformApiUrl();
-        const response = await fetch(`${apiUrl}/auth/provision-tenant`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-                store_name: storeName,
-                country_code: countryCode,
-            })
-        });
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to provision tenant');
-        }
         return response.json();
     }
 
