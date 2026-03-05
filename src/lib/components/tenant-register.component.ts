@@ -558,7 +558,7 @@ export class TenantRegisterComponent implements OnInit {
     @Input() tenantSlugLabel: string = 'Organization URL';
     @Input() tenantSlugPlaceholder: string = 'organization-name';
     @Input() urlPreviewEnabled: boolean = true;
-    @Input() urlPreviewPrefix: string = 'medstoreapp.in/';
+    @Input() urlPreviewPrefix: string = 'yourapp.com/';
 
     // User Labels
     @Input() userSectionTitle: string = 'Your Information';
