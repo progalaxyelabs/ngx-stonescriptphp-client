@@ -6,8 +6,9 @@
 export * from './provide';                  // provideNgxStoneScriptPhpClient()
 export * from './auth.plugin';              // AuthPlugin, AUTH_PLUGIN, AuthResult, User, ...
 
-// ── Built-in auth plugin ──────────────────────────────────────────────────────
+// ── Auth plugins ─────────────────────────────────────────────────────────────
 export * from './plugins/stonescriptphp-auth.plugin'; // StoneScriptPHPAuth, StoneScriptPHPAuthConfig
+export * from './plugins/progalaxyelabs-auth.plugin'; // ProgalaxyElabsAuth, ProgalaxyElabsAuthConfig
 
 // ── Services ──────────────────────────────────────────────────────────────────
 export * from './api-connection.service';

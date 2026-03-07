@@ -741,7 +741,14 @@ export class TenantLoginComponent implements OnInit {
 
             // Auto-select if user has only one tenant
             if (this.memberships.length === 1 && this.autoSelectSingleTenant) {
-                await this.selectAndContinue(this.memberships[0]);
+                const m = this.memberships[0];
+                // If login already returned a tenant-scoped token (via membership in response),
+                // just emit — no need to call select-tenant again.
+                if (loginResult?.membership) {
+                    this.tenantSelected.emit({ tenantId: m.tenant_id, tenantSlug: m.slug, role: m.role });
+                    return;
+                }
+                await this.selectAndContinue(m);
             } else {
                 // Show tenant selector
                 this.showingTenantSelector = true;
