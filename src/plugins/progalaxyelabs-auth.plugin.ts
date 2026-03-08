@@ -258,7 +258,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                 isNewIdentity: true,
                 authMethod: data.auth_method,
                 oauthProvider: data.oauth_provider,
-                identity: data.identity,
+                user: this.toUser(data.identity),
             };
         }
 

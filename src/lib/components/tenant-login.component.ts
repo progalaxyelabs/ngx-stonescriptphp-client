@@ -670,12 +670,16 @@ export class TenantLoginComponent implements OnInit {
             }
 
             // New identity — user exists but has no tenant membership
-            if (result.isNewIdentity && result.identity) {
+            if (result.isNewIdentity && result.user) {
                 this.needsOnboarding.emit({
                     auth_method: result.authMethod || 'oauth',
                     oauth_provider: result.oauthProvider,
                     is_new_identity: true,
-                    identity: result.identity,
+                    identity: {
+                        email: result.user.email,
+                        display_name: result.user.display_name,
+                        picture: result.user.photo_url,
+                    },
                 });
                 return;
             }
