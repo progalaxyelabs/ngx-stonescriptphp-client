@@ -249,16 +249,18 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
     // -- Internal helpers -----------------------------------------------------
 
     private handleLoginResponse(data: any): AuthResult {
-        // New identity — needs onboarding
-        if (data.is_new_identity) {
+        // Identity with no tenant memberships — needs onboarding
+        // Covers both new registration (is_new_identity=true) and
+        // returning user who hasn't created a tenant yet (is_new_identity=false, memberships=[])
+        if (data.identity && (!data.membership)) {
             return {
                 success: true,
                 accessToken: data.access_token,
                 refreshToken: data.refresh_token,
-                isNewIdentity: true,
+                user: this.toUser(data.identity),
+                isNewIdentity: data.is_new_identity ?? false,
                 authMethod: data.auth_method,
                 oauthProvider: data.oauth_provider,
-                user: this.toUser(data.identity),
             };
         }
 
