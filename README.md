@@ -74,6 +74,37 @@ authProviders: {
 
 See [Configuration](#configuration) and [AUTH-PROVIDER-CONFIG.md](AUTH-PROVIDER-CONFIG.md) for details.
 
+### Accessing User Info
+
+After login or registration, the library stores the authenticated user. Access it in any component:
+
+```typescript
+import { AuthService, User } from '@progalaxyelabs/ngx-stonescriptphp-client';
+
+@Component({ ... })
+export class MyComponent {
+  constructor(private authService: AuthService) {}
+
+  ngOnInit() {
+    // Snapshot — current user or null if not authenticated
+    const user: User | null = this.authService.getCurrentUser();
+    if (user) {
+      console.log(user.display_name);   // "John Doe"
+      console.log(user.email);          // "john@example.com"
+      console.log(user.photo_url);      // avatar URL (optional)
+      console.log(user.is_email_verified);
+    }
+
+    // Reactive — emits on login, logout, and token refresh
+    this.authService.user$.subscribe(user => {
+      // user is User | null
+    });
+  }
+}
+```
+
+The `User` object is persisted in localStorage and restored on page refresh. It is populated from the auth service API response (not from the JWT token).
+
 📖 **Documentation**: [CHANGELOG](docs/CHANGELOG.md) | [Auth Compatibility](docs/AUTH_COMPATIBILITY.md) | [Provider Config](AUTH-PROVIDER-CONFIG.md) | [Modal Auth Spec](MODAL-AUTH-SPEC.md) | [Multi-Auth Server](MULTI-AUTH-SERVER.md)
 
 ---
