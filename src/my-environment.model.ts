@@ -119,6 +119,14 @@ export class MyEnvironmentModel {
     production: boolean = true
 
     /**
+     * Enable debug logging across the app.
+     * Set to true in development environments to see [DEBUG] logs in the browser console.
+     * Always false in production.
+     * @default false
+     */
+    debug?: boolean = false
+
+    /**
      * Platform code identifier (e.g., 'progalaxy', 'hr', 'admin').
      * Used for multi-tenant authentication.
      */

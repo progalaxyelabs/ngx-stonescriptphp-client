@@ -14,6 +14,7 @@ export * from './plugins/progalaxyelabs-auth.plugin'; // ProgalaxyElabsAuth, Pro
 export * from './api-connection.service';
 export * from './auth.service';
 export * from './db.service';
+export * from './log.service';
 export * from './signin-status.service';
 export * from './token.service';
 export * from './csrf.service';
