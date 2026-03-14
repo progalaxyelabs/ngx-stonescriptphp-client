@@ -29,6 +29,7 @@ export * from './files.model';
 // ── UI Components - Embeddable (standalone components) ────────────────────────
 export * from './lib/components/auth-page.component';
 export * from './lib/components/login-dialog.component';
+export * from './lib/components/month-year-picker.component';
 export * from './lib/components/register.component';
 export * from './lib/components/tenant-login.component';
 export * from './lib/components/tenant-register.component';
