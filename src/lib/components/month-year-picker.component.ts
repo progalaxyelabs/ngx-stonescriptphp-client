@@ -20,7 +20,8 @@ export interface MonthYear {
     </button>
 
     @if (isOpen()) {
-      <div class="border rounded mt-1" style="overflow: hidden; position: relative; z-index: 10; background: white;">
+      <div class="nsx-myp-backdrop" (click)="cancel()"></div>
+      <div class="nsx-myp-popup border rounded shadow">
 
         <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-body-tertiary border-bottom">
           <span class="text-uppercase text-muted fw-semibold" style="font-size: 10px; letter-spacing: .08em;">
@@ -102,6 +103,25 @@ export interface MonthYear {
       </div>
     }
   `,
+  styles: [`
+    :host { position: relative; display: block; }
+    .nsx-myp-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1050;
+    }
+    .nsx-myp-popup {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1051;
+      background: white;
+      width: 300px;
+      max-width: 92vw;
+      overflow: hidden;
+    }
+  `],
 })
 export class MonthYearPickerComponent {
   label = input<string>('Select date');
