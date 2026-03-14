@@ -161,8 +161,8 @@ export class MonthYearPickerComponent {
 
   open(): void {
     const v = this.value();
-    this.tempMonth.set(v?.month ?? null);
-    this.tempYear.set(v?.year ?? null);
+    this.tempMonth.set(v?.month ?? this.today.month);
+    this.tempYear.set(v?.year ?? this.today.year);
     this.isOpen.set(true);
   }
 
