@@ -30,11 +30,12 @@ export interface MonthYear {
           <span class="font-monospace fw-semibold">{{ preview() }}</span>
         </div>
 
-        <div class="px-2 pt-2 pb-1">
-          <div class="text-uppercase text-muted px-1 mb-1" style="font-size: 10px; letter-spacing: .08em;">Month</div>
-          <div class="row row-cols-4 g-1">
-            @for (month of MONTHS; track $index) {
-              <div class="col">
+        <div class="nsx-myp-body">
+          <!-- Months: 6 rows × 2 cols -->
+          <div class="nsx-myp-section">
+            <div class="text-uppercase text-muted px-1 mb-1" style="font-size: 10px; letter-spacing: .08em;">Month</div>
+            <div class="nsx-myp-grid nsx-myp-grid-2">
+              @for (month of MONTHS; track $index) {
                 <button
                   type="button"
                   class="btn btn-sm w-100"
@@ -44,16 +45,15 @@ export interface MonthYear {
                   (click)="selectMonth($index)">
                   {{ month }}
                 </button>
-              </div>
-            }
+              }
+            </div>
           </div>
-        </div>
 
-        <div class="px-2 pt-1 pb-2">
-          <div class="text-uppercase text-muted px-1 mb-1" style="font-size: 10px; letter-spacing: .08em;">Year</div>
-          <div class="row row-cols-4 g-1">
-            @for (year of years(); track year) {
-              <div class="col">
+          <!-- Years: 5 rows × 2 cols + nav row -->
+          <div class="nsx-myp-section">
+            <div class="text-uppercase text-muted px-1 mb-1" style="font-size: 10px; letter-spacing: .08em;">Year</div>
+            <div class="nsx-myp-grid nsx-myp-grid-2">
+              @for (year of years(); track year) {
                 <button
                   type="button"
                   class="btn btn-sm w-100 font-monospace"
@@ -63,19 +63,12 @@ export interface MonthYear {
                   (click)="selectYear(year)">
                   {{ year }}
                 </button>
-              </div>
-            }
-          </div>
-
-          <div class="row g-1 mt-1">
-            <div class="col">
-              <button type="button" class="btn btn-sm btn-light w-100" (click)="shiftYears(-12)">
-                &lsaquo; Earlier
+              }
+              <button type="button" class="btn btn-sm btn-light w-100" (click)="shiftYears(-10)">
+                &lsaquo;
               </button>
-            </div>
-            <div class="col">
-              <button type="button" class="btn btn-sm btn-light w-100" (click)="shiftYears(12)">
-                Later &rsaquo;
+              <button type="button" class="btn btn-sm btn-light w-100" (click)="shiftYears(10)">
+                &rsaquo;
               </button>
             </div>
           </div>
@@ -85,17 +78,17 @@ export interface MonthYear {
           <div class="col border-end">
             <button
               type="button"
-              class="btn w-100 rounded-0 py-2 fw-semibold text-success"
-              (click)="confirm()">
-              OK
+              class="btn btn-light w-100 rounded-0 py-2"
+              (click)="cancel()">
+              Cancel
             </button>
           </div>
           <div class="col">
             <button
               type="button"
-              class="btn btn-light w-100 rounded-0 py-2"
-              (click)="cancel()">
-              Cancel
+              class="btn w-100 rounded-0 py-2 fw-semibold text-success"
+              (click)="confirm()">
+              OK
             </button>
           </div>
         </div>
@@ -117,9 +110,25 @@ export interface MonthYear {
       transform: translate(-50%, -50%);
       z-index: 1051;
       background: white;
-      width: 300px;
+      width: 340px;
       max-width: 92vw;
       overflow: hidden;
+    }
+    .nsx-myp-body {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem;
+    }
+    .nsx-myp-section {
+      flex: 1;
+      min-width: 0;
+    }
+    .nsx-myp-grid {
+      display: grid;
+      gap: 3px;
+    }
+    .nsx-myp-grid-2 {
+      grid-template-columns: 1fr 1fr;
     }
   `],
 })
@@ -139,10 +148,10 @@ export class MonthYearPickerComponent {
   isOpen    = signal(false);
   tempMonth = signal<number | null>(null);
   tempYear  = signal<number | null>(null);
-  yearStart = signal(this.today.year - 4);
+  yearStart = signal(this.today.year - 3);
 
   years = computed(() =>
-    Array.from({ length: 12 }, (_, i) => this.yearStart() + i)
+    Array.from({ length: 10 }, (_, i) => this.yearStart() + i)
   );
 
   displayValue = computed(() => {
