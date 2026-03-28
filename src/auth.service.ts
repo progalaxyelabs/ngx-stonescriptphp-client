@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
-import { AUTH_PLUGIN, AuthPlugin, AuthResult, TenantMembership, User } from './auth.plugin';
+import { AUTH_PLUGIN, AuthPlugin, AuthResult, OtpSendResponse, OtpVerifyResponse, TenantMembership, User } from './auth.plugin';
 
 // Re-export types for backward compatibility
 export type { AuthResult, TenantMembership, User };
@@ -185,6 +185,40 @@ export class AuthService {
 
     getCurrentUser(): User | null {
         return this.userSubject.value;
+    }
+
+    // ── OTP authentication ─────────────────────────────────────────────────────
+
+    async sendOtp(identifier: string): Promise<OtpSendResponse> {
+        if (!this.plugin.sendOtp) {
+            return { success: false, identifier_type: 'email', masked_identifier: '', expires_in: 0, resend_after: 0 };
+        }
+        return this.plugin.sendOtp(identifier);
+    }
+
+    async verifyOtp(identifier: string, code: string): Promise<OtpVerifyResponse> {
+        if (!this.plugin.verifyOtp) {
+            return { success: false, verified_token: '' };
+        }
+        return this.plugin.verifyOtp(identifier, code);
+    }
+
+    async identityLogin(verifiedToken: string): Promise<AuthResult> {
+        if (!this.plugin.identityLogin) {
+            return { success: false, message: 'OTP login not supported by the configured auth plugin' };
+        }
+        const result = await this.plugin.identityLogin(verifiedToken);
+        if (result.success) this.storeAuthResult(result);
+        return result;
+    }
+
+    async identityRegister(verifiedToken: string, displayName: string): Promise<AuthResult> {
+        if (!this.plugin.identityRegister) {
+            return { success: false, message: 'OTP registration not supported by the configured auth plugin' };
+        }
+        const result = await this.plugin.identityRegister(verifiedToken, displayName);
+        if (result.success) this.storeAuthResult(result);
+        return result;
     }
 
     // ── Multi-tenant operations ───────────────────────────────────────────────

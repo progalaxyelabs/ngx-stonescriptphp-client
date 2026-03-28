@@ -6,9 +6,25 @@ export interface User {
     user_id?: number;          // Optional - not present in new auth responses (post-cleanup)
     id?: string;               // Optional - not present in new auth responses (post-cleanup)
     email: string;
+    phone?: string;            // E.164 format (e.g., +919876543210) — set for phone-based auth
     display_name: string;      // Always provided (fallback to email prefix if missing)
     photo_url?: string;
     is_email_verified: boolean; // Always provided (defaults to false if missing)
+}
+
+// ── OTP types ────────────────────────────────────────────────────────────────
+
+export interface OtpSendResponse {
+    success: boolean;
+    identifier_type: 'email' | 'phone';
+    masked_identifier: string;
+    expires_in: number;
+    resend_after: number;
+}
+
+export interface OtpVerifyResponse {
+    success: boolean;
+    verified_token: string;
 }
 
 export interface AuthResult {
@@ -121,6 +137,20 @@ export interface AuthPlugin {
 
     /** Check if user email exists */
     checkEmail?(email: string): Promise<{ exists: boolean; user?: any }>;
+
+    // ── OTP authentication ──────────────────────────────────────────────────────
+
+    /** Send OTP to email or phone identifier */
+    sendOtp?(identifier: string): Promise<OtpSendResponse>;
+
+    /** Verify OTP code and receive a verified_token */
+    verifyOtp?(identifier: string, code: string): Promise<OtpVerifyResponse>;
+
+    /** Login with a verified_token (obtained from verifyOtp) */
+    identityLogin?(verifiedToken: string): Promise<AuthResult>;
+
+    /** Register a new identity with a verified_token (for new users) */
+    identityRegister?(verifiedToken: string, displayName: string): Promise<AuthResult>;
 
     // ── Multi-server (implemented by StoneScriptPHPAuth) ──────────────────────
 

@@ -1,4 +1,4 @@
-import { AuthPlugin, AuthResult, TenantMembership, User } from '../auth.plugin';
+import { AuthPlugin, AuthResult, OtpSendResponse, OtpVerifyResponse, TenantMembership, User } from '../auth.plugin';
 
 export interface ProgalaxyElabsAuthConfig {
     host: string;
@@ -178,6 +178,109 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
         }
     }
 
+    // -- OTP authentication --------------------------------------------------
+
+    async sendOtp(identifier: string): Promise<OtpSendResponse> {
+        try {
+            const response = await fetch(`${this.host}/api/auth/otp/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                return {
+                    success: false,
+                    identifier_type: 'email',
+                    masked_identifier: '',
+                    expires_in: 0,
+                    resend_after: 0,
+                    ...data
+                };
+            }
+            return {
+                success: data.success ?? true,
+                identifier_type: data.identifier_type,
+                masked_identifier: data.masked_identifier,
+                expires_in: data.expires_in,
+                resend_after: data.resend_after
+            };
+        } catch {
+            return {
+                success: false,
+                identifier_type: 'email',
+                masked_identifier: '',
+                expires_in: 0,
+                resend_after: 0
+            };
+        }
+    }
+
+    async verifyOtp(identifier: string, code: string): Promise<OtpVerifyResponse> {
+        try {
+            const response = await fetch(`${this.host}/api/auth/otp/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier, code })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                return { success: false, verified_token: '', ...data };
+            }
+            return {
+                success: data.success ?? true,
+                verified_token: data.verified_token
+            };
+        } catch {
+            return { success: false, verified_token: '' };
+        }
+    }
+
+    async identityLogin(verifiedToken: string): Promise<AuthResult> {
+        try {
+            const response = await fetch(`${this.host}/api/identity/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    verified_token: verifiedToken,
+                    platform: this.config.platformCode
+                })
+            });
+            // 404 means no identity found — caller should show registration form
+            if (response.status === 404) {
+                return { success: false, message: 'identity_not_found' };
+            }
+            const data = await response.json();
+            if (!response.ok) {
+                return { success: false, message: data.error || data.message || 'Login failed' };
+            }
+            return this.handleLoginResponse(data);
+        } catch {
+            return { success: false, message: 'Network error. Please try again.' };
+        }
+    }
+
+    async identityRegister(verifiedToken: string, displayName: string): Promise<AuthResult> {
+        try {
+            const response = await fetch(`${this.host}/api/identity/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    verified_token: verifiedToken,
+                    display_name: displayName,
+                    platform: this.config.platformCode
+                })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                return { success: false, message: data.error || data.message || 'Registration failed' };
+            }
+            return this.handleLoginResponse(data);
+        } catch {
+            return { success: false, message: 'Network error. Please try again.' };
+        }
+    }
+
     // -- OAuth ----------------------------------------------------------------
 
     async loginWithProvider(provider: string): Promise<AuthResult> {
@@ -286,7 +389,8 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
     private toUser(raw: any): User | undefined {
         if (!raw) return undefined;
         return {
-            email: raw.email,
+            email: raw.email ?? '',
+            phone: raw.phone,
             display_name: raw.display_name ?? raw.email?.split('@')[0] ?? '',
             photo_url: raw.photo_url ?? raw.picture,
             is_email_verified: raw.is_email_verified ?? false
