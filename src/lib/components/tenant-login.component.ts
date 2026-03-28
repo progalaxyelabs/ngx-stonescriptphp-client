@@ -1084,7 +1084,7 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         // Normalize: auto-prepend +91 for 10-digit Indian numbers
         if (type === 'phone') {
             const digits = raw.replace(/\D/g, '');
-            this.otpNormalizedIdentifier = digits.length === 10 ? `+91${digits}` : (raw.startsWith('+') ? raw : `+${digits}`);
+            this.otpNormalizedIdentifier = digits.length === 10 ? `+91${digits}` : `+${digits}`;
         } else {
             this.otpNormalizedIdentifier = raw;
         }
@@ -1114,6 +1114,8 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
 
     /** Verify the entered OTP code */
     async onOtpVerify() {
+        if (this.loading) return;
+
         const code = this.otpCode;
         if (code.length < 6) {
             this.error = 'Please enter the complete 6-digit code';
@@ -1171,6 +1173,14 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
             const result = await this.auth.identityRegister(this.otpVerifiedToken, name);
 
             if (!result.success) {
+                // If token expired, restart OTP flow
+                if (result.message?.includes('expired') || result.message?.includes('Invalid')) {
+                    this.error = 'Session expired. Please verify again.';
+                    this.otpStep = 'identifier';
+                    this.otpVerifiedToken = '';
+                    this.otpDisplayName = '';
+                    return;
+                }
                 this.error = result.message || 'Registration failed';
                 return;
             }
