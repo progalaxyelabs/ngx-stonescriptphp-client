@@ -211,15 +211,15 @@ export interface OnboardingNeededEvent {
                             </button>
                         }
                     </div>
+                }
 
-                    <!-- Switch to Email/Password -->
-                    @if (isProviderEnabled('emailPassword') && effectiveOauthProviders.length > 0) {
-                        <div class="switch-method">
-                            <a href="#" (click)="toggleAuthMethod($event)">
-                                {{ useOAuth ? 'Use email/password instead' : 'Use OAuth instead' }}
-                            </a>
-                        </div>
-                    }
+                <!-- Switch between OAuth and Email/Password -->
+                @if (isProviderEnabled('emailPassword') && effectiveOauthProviders.length > 0 && !otpActive) {
+                    <div class="switch-method">
+                        <a href="#" (click)="toggleAuthMethod($event)">
+                            {{ useOAuth ? 'Use email/password instead' : 'Use OAuth instead' }}
+                        </a>
+                    </div>
                 }
 
                 <!-- Error Message -->
