@@ -2,6 +2,7 @@ import { Injectable, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
+import { MyEnvironmentModel } from './my-environment.model';
 import { AUTH_PLUGIN, AuthPlugin, AuthResult, OtpSendResponse, OtpVerifyResponse, TenantMembership, User } from './auth.plugin';
 
 // Re-export types for backward compatibility
@@ -39,7 +40,8 @@ export class AuthService {
     constructor(
         @Inject(AUTH_PLUGIN) private plugin: AuthPlugin,
         private tokens: TokenService,
-        private signinStatus: SigninStatusService
+        private signinStatus: SigninStatusService,
+        private environment: MyEnvironmentModel
     ) {
         this.restoreUser();
     }
@@ -181,6 +183,41 @@ export class AuthService {
 
     isAuthenticated(): boolean {
         return this.tokens.hasValidAccessToken();
+    }
+
+    // ── Profile management ────────────────────────────────────────────────────
+
+    /**
+     * Update the authenticated user's display name.
+     * Calls PUT /api/account/profile with { display_name } and updates local user state on success.
+     */
+    async updateProfile(displayName: string): Promise<{ success: boolean; message?: string }> {
+        const accessToken = this.tokens.getAccessToken();
+        if (!accessToken) {
+            return { success: false, message: 'Not authenticated' };
+        }
+        try {
+            const host = this.environment.apiServer.host;
+            const response = await fetch(`${host}/api/account/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({ display_name: displayName })
+            });
+            const data = await response.json();
+            if (data.status === 'ok') {
+                const currentUser = this.getCurrentUser();
+                if (currentUser) {
+                    this.updateUser({ ...currentUser, display_name: displayName });
+                }
+                return { success: true };
+            }
+            return { success: false, message: data.message || 'Profile update failed' };
+        } catch {
+            return { success: false, message: 'Network error. Please try again.' };
+        }
     }
 
     getCurrentUser(): User | null {
