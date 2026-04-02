@@ -192,8 +192,8 @@ export interface OnboardingNeededEvent {
                     }
                 }
 
-                <!-- OAuth Providers -->
-                @if (effectiveOauthProviders.length > 0 && !otpActive && (useOAuth || !isProviderEnabled('emailPassword'))) {
+                <!-- OAuth Providers (always visible as alternative sign-in) -->
+                @if (effectiveOauthProviders.length > 0) {
                     <div class="oauth-buttons">
                         @for (provider of effectiveOauthProviders; track provider) {
                             <button
