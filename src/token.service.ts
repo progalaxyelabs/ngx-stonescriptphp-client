@@ -70,4 +70,27 @@ export class TokenService {
         const token = this.getAccessToken()
         return token !== null && token !== ''
     }
+
+    /**
+     * Decode the payload of a JWT without verifying the signature.
+     * Returns the parsed claims object, or null if the token is invalid/missing.
+     *
+     * Usage: const claims = tokenService.decodeJwtPayload(token);
+     *        const role = claims?.role;
+     */
+    decodeJwtPayload(token?: string): Record<string, any> | null {
+        const jwt = token ?? this.getAccessToken()
+        if (!jwt) return null
+        try {
+            const parts = jwt.split('.')
+            if (parts.length !== 3) return null
+            // Base64url → Base64 → JSON
+            const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+            const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+            const json = atob(padded)
+            return JSON.parse(json)
+        } catch {
+            return null
+        }
+    }
 }

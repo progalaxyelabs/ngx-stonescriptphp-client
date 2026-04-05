@@ -121,6 +121,10 @@ export class StoneScriptPHPAuth implements AuthPlugin {
         } else if (raw.id) {
             user.user_id = this.hashUUID(raw.id);
         }
+        // Populate role from raw data if available
+        if (raw.role) {
+            user.role = raw.role;
+        }
         return user;
     }
 

@@ -77,8 +77,28 @@ export class AuthService {
     private storeAuthResult(result: AuthResult): void {
         if (result.accessToken) this.tokens.setAccessToken(result.accessToken);
         if (result.refreshToken) this.tokens.setRefreshToken(result.refreshToken);
-        if (result.user) this.updateUser(result.user);
+        if (result.user) {
+            // Enrich user with role from JWT claims if not already set
+            const user = result.user.role
+                ? result.user
+                : this.enrichUserWithJwtRole(result.user, result.accessToken);
+            this.updateUser(user);
+        }
         this.signinStatus.setSigninStatus(true);
+    }
+
+    /**
+     * Decode the access token and attach the `role` claim to the user object.
+     * Falls back to role from the membership field in the AuthResult if no JWT role found.
+     */
+    private enrichUserWithJwtRole(user: User, accessToken?: string): User {
+        if (accessToken) {
+            const claims = this.tokens.decodeJwtPayload(accessToken);
+            if (claims?.role) {
+                return { ...user, role: claims.role };
+            }
+        }
+        return user;
     }
 
     // ── Core auth operations ──────────────────────────────────────────────────
@@ -146,13 +166,21 @@ export class AuthService {
 
     async checkSession(serverName?: string): Promise<boolean> {
         if (this.tokens.hasValidAccessToken()) {
+            // If we already have a stored user, update their role from the current JWT
+            const storedUser = this.getCurrentUser();
+            if (storedUser && !storedUser.role) {
+                const enriched = this.enrichUserWithJwtRole(storedUser);
+                if (enriched.role) this.updateUser(enriched);
+            }
             this.signinStatus.setSigninStatus(true);
             return true;
         }
         const result = await this.plugin.checkSession();
         if (result.success && result.accessToken) {
             this.tokens.setAccessToken(result.accessToken);
-            if (result.user) this.updateUser(result.user);
+            if (result.user) {
+                this.updateUser(this.enrichUserWithJwtRole(result.user, result.accessToken));
+            }
             this.signinStatus.setSigninStatus(true);
             return true;
         }

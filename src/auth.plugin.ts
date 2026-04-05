@@ -10,6 +10,7 @@ export interface User {
     display_name: string;      // Always provided (fallback to email prefix if missing)
     photo_url?: string;
     is_email_verified: boolean; // Always provided (defaults to false if missing)
+    role?: string;             // Tenant role (e.g., 'admin', 'member') — extracted from JWT claims
 }
 
 // ── OTP types ────────────────────────────────────────────────────────────────

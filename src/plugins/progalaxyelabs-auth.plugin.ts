@@ -122,7 +122,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                 success: true,
                 accessToken: data.access_token,
                 refreshToken: data.refresh_token,
-                user: this.toUser(data.identity),
+                user: this.toUser(data.identity, data.membership?.role),
                 membership: this.toMembership(data.membership),
             };
         } catch {
@@ -381,20 +381,24 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
             success: true,
             accessToken: data.access_token,
             refreshToken: data.refresh_token,
-            user: this.toUser(data.identity),
+            user: this.toUser(data.identity, data.membership?.role),
             membership: this.toMembership(data.membership),
         };
     }
 
-    private toUser(raw: any): User | undefined {
+    private toUser(raw: any, role?: string): User | undefined {
         if (!raw) return undefined;
-        return {
+        const user: User = {
             email: raw.email ?? '',
             phone: raw.phone,
             display_name: raw.display_name ?? raw.email?.split('@')[0] ?? '',
             photo_url: raw.photo_url ?? raw.picture,
             is_email_verified: raw.is_email_verified ?? false
         };
+        // Populate role: prefer explicit param, then raw.role, then raw.membership?.role
+        const resolvedRole = role ?? raw.role ?? raw.membership?.role;
+        if (resolvedRole) user.role = resolvedRole;
+        return user;
     }
 
     private toMembership(raw: any): TenantMembership {
