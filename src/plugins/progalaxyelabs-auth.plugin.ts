@@ -30,7 +30,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
             const response = await fetch(`${this.host}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, platform: this.config.platformCode })
+                body: JSON.stringify({ email, password, platform_code: this.config.platformCode })
             });
             const data = await response.json();
             if (!response.ok) {
@@ -51,7 +51,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                     email,
                     password,
                     display_name: displayName,
-                    platform: this.config.platformCode
+                    platform_code: this.config.platformCode
                 })
             });
             const data = await response.json();
@@ -243,7 +243,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     verified_token: verifiedToken,
-                    platform: this.config.platformCode
+                    platform_code: this.config.platformCode
                 })
             });
             // 404 means no identity found — caller should show registration form
@@ -268,7 +268,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                 body: JSON.stringify({
                     verified_token: verifiedToken,
                     display_name: displayName,
-                    platform: this.config.platformCode
+                    platform_code: this.config.platformCode
                 })
             });
             const data = await response.json();
@@ -289,7 +289,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
             const left = (window.screen.width - width) / 2;
             const top = (window.screen.height - height) / 2;
 
-            const oauthUrl = `${this.host}/oauth/${provider}?platform=${this.config.platformCode}&mode=popup`;
+            const oauthUrl = `${this.host}/oauth/${provider}?platform_code=${this.config.platformCode}&mode=popup`;
             const popup = window.open(oauthUrl, `${provider}_login`,
                 `width=${width},height=${height},left=${left},top=${top}`);
 

@@ -215,7 +215,7 @@ export class StoneScriptPHPAuth implements AuthPlugin {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ email, password, platform: this.config.platformCode })
+                body: JSON.stringify({ email, password, platform_code: this.config.platformCode })
             });
             const data = await response.json();
             if (this.isAuthSuccess(data)) {
@@ -244,7 +244,7 @@ export class StoneScriptPHPAuth implements AuthPlugin {
                     email,
                     password,
                     display_name: displayName,
-                    platform: this.config.platformCode
+                    platform_code: this.config.platformCode
                 })
             });
             const data = await response.json();
@@ -370,7 +370,7 @@ export class StoneScriptPHPAuth implements AuthPlugin {
             const top = (window.screen.height - height) / 2;
 
             const accountsUrl = this.getAccountsUrl();
-            const oauthUrl = `${accountsUrl}/oauth/${provider}?platform=${this.config.platformCode}&mode=popup`;
+            const oauthUrl = `${accountsUrl}/oauth/${provider}?platform_code=${this.config.platformCode}&mode=popup`;
 
             const popup = window.open(oauthUrl, `${provider}_login`,
                 `width=${width},height=${height},left=${left},top=${top}`);
