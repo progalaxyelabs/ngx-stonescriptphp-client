@@ -185,7 +185,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
             const response = await fetch(`${this.host}/api/auth/otp/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ identifier })
+                body: JSON.stringify({ identifier, platform_code: this.config.platformCode })
             });
             const data = await response.json();
             if (!response.ok) {
