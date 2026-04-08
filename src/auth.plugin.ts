@@ -26,6 +26,12 @@ export interface OtpSendResponse {
 export interface OtpVerifyResponse {
     success: boolean;
     verified_token: string;
+    // Structured error fields (when success=false)
+    error?: string;               // 'otp_expired' | 'otp_invalid' | 'otp_rate_limited' | 'otp_not_found'
+    message?: string;
+    remaining_attempts?: number;  // present when error='otp_invalid'
+    can_resend?: boolean;         // present when error='otp_expired' | 'otp_not_found'
+    retry_after?: number;         // present when error='otp_rate_limited'
 }
 
 export interface AuthResult {

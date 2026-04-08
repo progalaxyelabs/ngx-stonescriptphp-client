@@ -42,6 +42,11 @@ export interface OnboardingNeededEvent {
                     <!-- OTP Step 1: Identifier entry -->
                     @if (otpStep === 'identifier') {
                         <form (ngSubmit)="onOtpSend()" class="otp-form">
+                            @if (otpIdentifierError) {
+                                <div [class]="'otp-identifier-error otp-identifier-error--' + otpIdentifierErrorColor">
+                                    {{ otpIdentifierError }}
+                                </div>
+                            }
                             <div class="form-group">
                                 <input
                                     [(ngModel)]="otpIdentifier"
@@ -671,6 +676,23 @@ export interface OnboardingNeededEvent {
             font-size: 14px;
         }
 
+        .otp-identifier-error {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .otp-identifier-error--red {
+            background: #fee;
+            color: #c33;
+        }
+
+        .otp-identifier-error--orange {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -779,6 +801,8 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     otpStep: OtpStep = 'identifier';
     otpIdentifier = '';
     otpIdentifierHint = '';
+    otpIdentifierError = '';
+    otpIdentifierErrorColor: 'orange' | 'red' = 'red';
     otpNormalizedIdentifier = '';  // E.164 for phone, as-is for email
     otpMaskedIdentifier = '';
     otpDigits: string[] = ['', '', '', '', '', ''];
@@ -1091,6 +1115,7 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
 
         this.loading = true;
         this.error = '';
+        this.otpIdentifierError = '';
 
         try {
             const result = await this.auth.sendOtp(this.otpNormalizedIdentifier);
@@ -1128,7 +1153,26 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         try {
             const verifyResult = await this.auth.verifyOtp(this.otpNormalizedIdentifier, code);
             if (!verifyResult.success) {
-                this.error = 'Invalid code. Please try again.';
+                switch (verifyResult.error) {
+                    case 'otp_expired':
+                        this.resetToIdentifierStep('Your code has expired. Please request a new one.', 'orange');
+                        break;
+                    case 'otp_invalid': {
+                        const attempts = verifyResult.remaining_attempts;
+                        this.error = attempts !== undefined
+                            ? `Invalid code. ${attempts} attempt${attempts === 1 ? '' : 's'} remaining.`
+                            : 'Invalid code. Please try again.';
+                        break;
+                    }
+                    case 'otp_rate_limited':
+                        this.resetToIdentifierStep('Too many attempts. Please try again later.', 'red');
+                        break;
+                    case 'otp_not_found':
+                        this.resetToIdentifierStep('No code found. Please request a new one.', 'orange');
+                        break;
+                    default:
+                        this.error = verifyResult.message || 'Invalid code. Please try again.';
+                }
                 return;
             }
 
@@ -1216,7 +1260,23 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         this.otpDigits = ['', '', '', '', '', ''];
         this.otpVerifiedToken = '';
         this.error = '';
+        this.otpIdentifierError = '';
         this.clearResendTimer();
+    }
+
+    /**
+     * Reset to the identifier entry step (step 1) with an error message.
+     * Used when OTP verification fails with a code that requires re-sending
+     * (expired, rate-limited, not-found). Keeps the identifier pre-filled.
+     */
+    private resetToIdentifierStep(message: string, color: 'orange' | 'red') {
+        this.otpStep = 'identifier';
+        this.otpDigits = ['', '', '', '', '', ''];
+        this.otpVerifiedToken = '';
+        this.error = '';
+        this.clearResendTimer();
+        this.otpIdentifierError = message;
+        this.otpIdentifierErrorColor = color;
     }
 
     // ── OTP digit input handling ─────────────────────────────────────────────
