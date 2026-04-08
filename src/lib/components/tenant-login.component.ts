@@ -51,7 +51,7 @@ export interface OnboardingNeededEvent {
                                 <input
                                     [(ngModel)]="otpIdentifier"
                                     name="otpIdentifier"
-                                    placeholder="Enter Email or Phone Number"
+                                    [placeholder]="otpPlaceholderText"
                                     type="text"
                                     required
                                     autocomplete="email tel"
@@ -113,7 +113,7 @@ export interface OnboardingNeededEvent {
                             </div>
                             <div class="otp-back">
                                 <a href="#" (click)="onOtpBack($event)">
-                                    Use a different email or phone
+                                    Use a different {{ otpIdentifierName }}
                                 </a>
                             </div>
                         </div>
@@ -765,6 +765,7 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     @Input() autoSelectSingleTenant: boolean = true;
     @Input() prefillEmail?: string;  // Email to prefill (for account linking flow)
     @Input() allowTenantCreation: boolean = true;
+    @Input() otpIdentifierTypes: ('email' | 'phone')[] = ['email', 'phone'];  // Allowed OTP identifier types
 
     // Tenant Selector Labels
     @Input() tenantSelectorTitle: string = 'Select Organization';
@@ -1095,13 +1096,13 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     async onOtpSend() {
         const raw = this.otpIdentifier.trim();
         if (!raw) {
-            this.error = 'Please enter your email or phone number';
+            this.error = `Please enter your ${this.otpIdentifierName}`;
             return;
         }
 
         const type = this.detectIdentifierType(raw);
         if (!type) {
-            this.error = 'Please enter a valid email address or phone number';
+            this.error = `Please enter a valid ${this.otpIdentifierName}`;
             return;
         }
 
@@ -1328,16 +1329,48 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         return this.otpDigits.join('');
     }
 
+    get otpPlaceholderText(): string {
+        const allowsEmail = this.otpIdentifierTypes.includes('email');
+        const allowsPhone = this.otpIdentifierTypes.includes('phone');
+
+        if (allowsEmail && allowsPhone) {
+            return 'Enter Email or Phone Number';
+        } else if (allowsEmail) {
+            return 'Enter Email';
+        } else if (allowsPhone) {
+            return 'Enter Phone Number';
+        }
+        return 'Enter Identifier';
+    }
+
+    get otpIdentifierName(): string {
+        const allowsEmail = this.otpIdentifierTypes.includes('email');
+        const allowsPhone = this.otpIdentifierTypes.includes('phone');
+
+        if (allowsEmail && allowsPhone) {
+            return 'email or phone number';
+        } else if (allowsEmail) {
+            return 'email';
+        } else if (allowsPhone) {
+            return 'phone number';
+        }
+        return 'identifier';
+    }
+
     // ── OTP helpers ──────────────────────────────────────────────────────────
 
     private detectIdentifierType(value: string): 'email' | 'phone' | null {
+        const allowsEmail = this.otpIdentifierTypes.includes('email');
+        const allowsPhone = this.otpIdentifierTypes.includes('phone');
+
         if (value.includes('@')) {
             // Basic email validation
-            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? 'email' : null;
+            const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+            return (isValidEmail && allowsEmail) ? 'email' : null;
         }
         const digits = value.replace(/\D/g, '');
         if (digits.length >= 10 && digits.length <= 15) {
-            return 'phone';
+            return allowsPhone ? 'phone' : null;
         }
         return null;
     }
