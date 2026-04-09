@@ -67,6 +67,14 @@ export interface OnboardingNeededEvent {
                                 class="btn btn-primary btn-block">
                                 {{ loading ? 'Sending...' : 'Send OTP' }}
                             </button>
+                            @if (error && otpIdentifier.trim()) {
+                                <button
+                                    type="button"
+                                    class="btn btn-link btn-block otp-already-have"
+                                    (click)="onSkipToOtpEntry()">
+                                    I already have an OTP
+                                </button>
+                            }
                         </form>
                     }
 
@@ -1136,6 +1144,15 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         } finally {
             this.loading = false;
         }
+    }
+
+    /** Skip to OTP code entry when user already has a code */
+    onSkipToOtpEntry(): void {
+        this.error = '';
+        this.otpMaskedIdentifier = this.otpIdentifier;
+        this.otpDigits = ['', '', '', '', '', ''];
+        this.otpStep = 'code';
+        setTimeout(() => this.focusOtpInput(0), 50);
     }
 
     /** Verify the entered OTP code */
