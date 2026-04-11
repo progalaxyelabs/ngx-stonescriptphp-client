@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChildren, QueryList, ElementRef, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChildren, QueryList, ElementRef, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, AuthProvider, AuthResult } from '../../auth.service';
@@ -832,7 +832,8 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     constructor(
         private auth: AuthService,
         private providerRegistry: ProviderRegistryService,
-        private zone: NgZone
+        private zone: NgZone,
+        private cdr: ChangeDetectorRef
     ) {}
 
     ngOnInit() {
@@ -1149,6 +1150,10 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
                 this.error = err.message || 'Failed to send OTP';
             } finally {
                 this.loading = false;
+                // Explicit CD tick — zone.run's sync frame has already exited by the time
+                // post-await continuations run, so NgZone microtask tracking can't be relied
+                // on when the underlying plugin uses raw fetch(). See #2227.
+                this.cdr.detectChanges();
             }
         });
     }
@@ -1229,6 +1234,10 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
                 this.error = err.message || 'Verification failed';
             } finally {
                 this.loading = false;
+                // Explicit CD tick — zone.run's sync frame has already exited by the time
+                // post-await continuations run, so NgZone microtask tracking can't be relied
+                // on when the underlying plugin uses raw fetch(). See #2227.
+                this.cdr.detectChanges();
             }
         });
     }
@@ -1280,6 +1289,10 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
                 this.error = err.message || 'Registration failed';
             } finally {
                 this.loading = false;
+                // Explicit CD tick — zone.run's sync frame has already exited by the time
+                // post-await continuations run, so NgZone microtask tracking can't be relied
+                // on when the underlying plugin uses raw fetch(). See #2227.
+                this.cdr.detectChanges();
             }
         });
     }
