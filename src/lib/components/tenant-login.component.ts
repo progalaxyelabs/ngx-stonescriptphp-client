@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChildren, QueryList, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChildren, QueryList, ElementRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, AuthProvider, AuthResult } from '../../auth.service';
@@ -831,7 +831,8 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
 
     constructor(
         private auth: AuthService,
-        private providerRegistry: ProviderRegistryService
+        private providerRegistry: ProviderRegistryService,
+        private zone: NgZone
     ) {}
 
     ngOnInit() {
@@ -1102,48 +1103,54 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
 
     /** Send OTP to the entered identifier */
     async onOtpSend() {
-        const raw = this.otpIdentifier.trim();
-        if (!raw) {
-            this.error = `Please enter your ${this.otpIdentifierName}`;
-            return;
-        }
-
-        const type = this.detectIdentifierType(raw);
-        if (!type) {
-            this.error = `Please enter a valid ${this.otpIdentifierName}`;
-            return;
-        }
-
-        // Normalize: auto-prepend +91 for 10-digit Indian numbers
-        if (type === 'phone') {
-            const digits = raw.replace(/\D/g, '');
-            this.otpNormalizedIdentifier = digits.length === 10 ? `+91${digits}` : `+${digits}`;
-        } else {
-            this.otpNormalizedIdentifier = raw;
-        }
-
-        this.loading = true;
-        this.error = '';
-        this.otpIdentifierError = '';
-
-        try {
-            const result = await this.auth.sendOtp(this.otpNormalizedIdentifier);
-            if (!result.success) {
-                this.error = 'Failed to send OTP. Please try again.';
+        // Wrap in NgZone so post-await state mutations trigger change detection.
+        // The underlying AuthService plugin uses raw fetch() which is NOT patched
+        // by the default zone.js polyfill, so awaited continuations would otherwise
+        // run outside NgZone and skip CD entirely. See #2227.
+        return this.zone.run(async () => {
+            const raw = this.otpIdentifier.trim();
+            if (!raw) {
+                this.error = `Please enter your ${this.otpIdentifierName}`;
                 return;
             }
-            this.otpMaskedIdentifier = result.masked_identifier;
-            this.otpDigits = ['', '', '', '', '', ''];
-            this.otpStep = 'code';
-            this.startResendCountdown(result.resend_after || 60);
 
-            // Focus first digit input after view update
-            setTimeout(() => this.focusOtpInput(0), 50);
-        } catch (err: any) {
-            this.error = err.message || 'Failed to send OTP';
-        } finally {
-            this.loading = false;
-        }
+            const type = this.detectIdentifierType(raw);
+            if (!type) {
+                this.error = `Please enter a valid ${this.otpIdentifierName}`;
+                return;
+            }
+
+            // Normalize: auto-prepend +91 for 10-digit Indian numbers
+            if (type === 'phone') {
+                const digits = raw.replace(/\D/g, '');
+                this.otpNormalizedIdentifier = digits.length === 10 ? `+91${digits}` : `+${digits}`;
+            } else {
+                this.otpNormalizedIdentifier = raw;
+            }
+
+            this.loading = true;
+            this.error = '';
+            this.otpIdentifierError = '';
+
+            try {
+                const result = await this.auth.sendOtp(this.otpNormalizedIdentifier);
+                if (!result.success) {
+                    this.error = 'Failed to send OTP. Please try again.';
+                    return;
+                }
+                this.otpMaskedIdentifier = result.masked_identifier;
+                this.otpDigits = ['', '', '', '', '', ''];
+                this.otpStep = 'code';
+                this.startResendCountdown(result.resend_after || 60);
+
+                // Focus first digit input after view update
+                setTimeout(() => this.focusOtpInput(0), 50);
+            } catch (err: any) {
+                this.error = err.message || 'Failed to send OTP';
+            } finally {
+                this.loading = false;
+            }
+        });
     }
 
     /** Skip to OTP code entry when user already has a code */
@@ -1157,112 +1164,124 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
 
     /** Verify the entered OTP code */
     async onOtpVerify() {
-        if (this.loading) return;
+        // Wrap in NgZone so post-await state mutations trigger change detection.
+        // The underlying AuthService plugin uses raw fetch() which is NOT patched
+        // by the default zone.js polyfill, so awaited continuations would otherwise
+        // run outside NgZone and skip CD entirely. See #2227.
+        return this.zone.run(async () => {
+            if (this.loading) return;
 
-        const code = this.otpCode;
-        if (code.length < 6) {
-            this.error = 'Please enter the complete 6-digit code';
-            return;
-        }
+            const code = this.otpCode;
+            if (code.length < 6) {
+                this.error = 'Please enter the complete 6-digit code';
+                return;
+            }
 
-        this.loading = true;
-        this.error = '';
+            this.loading = true;
+            this.error = '';
 
-        try {
-            const verifyResult = await this.auth.verifyOtp(this.otpNormalizedIdentifier, code);
-            if (!verifyResult.success) {
-                switch (verifyResult.error) {
-                    case 'otp_expired':
-                        this.resetToIdentifierStep('Your code has expired. Please request a new one.', 'orange');
-                        break;
-                    case 'otp_invalid': {
-                        const attempts = verifyResult.remaining_attempts;
-                        this.error = attempts !== undefined
-                            ? `Invalid code. ${attempts} attempt${attempts === 1 ? '' : 's'} remaining.`
-                            : 'Invalid code. Please try again.';
-                        break;
+            try {
+                const verifyResult = await this.auth.verifyOtp(this.otpNormalizedIdentifier, code);
+                if (!verifyResult.success) {
+                    switch (verifyResult.error) {
+                        case 'otp_expired':
+                            this.resetToIdentifierStep('Your code has expired. Please request a new one.', 'orange');
+                            break;
+                        case 'otp_invalid': {
+                            const attempts = verifyResult.remaining_attempts;
+                            this.error = attempts !== undefined
+                                ? `Invalid code. ${attempts} attempt${attempts === 1 ? '' : 's'} remaining.`
+                                : 'Invalid code. Please try again.';
+                            break;
+                        }
+                        case 'otp_rate_limited':
+                            this.resetToIdentifierStep('Too many attempts. Please try again later.', 'red');
+                            break;
+                        case 'otp_not_found':
+                            this.resetToIdentifierStep('No code found. Please request a new one.', 'orange');
+                            break;
+                        default:
+                            this.error = verifyResult.message || 'Invalid code. Please try again.';
                     }
-                    case 'otp_rate_limited':
-                        this.resetToIdentifierStep('Too many attempts. Please try again later.', 'red');
-                        break;
-                    case 'otp_not_found':
-                        this.resetToIdentifierStep('No code found. Please request a new one.', 'orange');
-                        break;
-                    default:
-                        this.error = verifyResult.message || 'Invalid code. Please try again.';
+                    return;
                 }
-                return;
+
+                this.otpVerifiedToken = verifyResult.verified_token;
+
+                // Auto-attempt login
+                const loginResult = await this.auth.identityLogin(this.otpVerifiedToken);
+
+                if (loginResult.success) {
+                    // Existing user — proceed with standard post-auth flow
+                    await this.handlePostAuthFlow(loginResult);
+                    return;
+                }
+
+                if (loginResult.message === 'identity_not_found') {
+                    // New user — show registration form
+                    this.otpStep = 'register';
+                    return;
+                }
+
+                // Other login error
+                this.error = loginResult.message || 'Login failed. Please try again.';
+            } catch (err: any) {
+                this.error = err.message || 'Verification failed';
+            } finally {
+                this.loading = false;
             }
-
-            this.otpVerifiedToken = verifyResult.verified_token;
-
-            // Auto-attempt login
-            const loginResult = await this.auth.identityLogin(this.otpVerifiedToken);
-
-            if (loginResult.success) {
-                // Existing user — proceed with standard post-auth flow
-                await this.handlePostAuthFlow(loginResult);
-                return;
-            }
-
-            if (loginResult.message === 'identity_not_found') {
-                // New user — show registration form
-                this.otpStep = 'register';
-                return;
-            }
-
-            // Other login error
-            this.error = loginResult.message || 'Login failed. Please try again.';
-        } catch (err: any) {
-            this.error = err.message || 'Verification failed';
-        } finally {
-            this.loading = false;
-        }
+        });
     }
 
     /** Register a new identity after OTP verification */
     async onOtpRegister() {
-        const name = this.otpDisplayName.trim();
-        if (!name) {
-            this.error = 'Please enter your name';
-            return;
-        }
-
-        this.loading = true;
-        this.error = '';
-
-        try {
-            const result = await this.auth.identityRegister(this.otpVerifiedToken, name);
-
-            if (!result.success) {
-                // If token expired, restart OTP flow
-                if (result.message?.includes('expired') || result.message?.includes('Invalid')) {
-                    this.error = 'Session expired. Please verify again.';
-                    this.otpStep = 'identifier';
-                    this.otpVerifiedToken = '';
-                    this.otpDisplayName = '';
-                    return;
-                }
-                this.error = result.message || 'Registration failed';
+        // Wrap in NgZone so post-await state mutations trigger change detection.
+        // The underlying AuthService plugin uses raw fetch() which is NOT patched
+        // by the default zone.js polyfill, so awaited continuations would otherwise
+        // run outside NgZone and skip CD entirely. See #2227.
+        return this.zone.run(async () => {
+            const name = this.otpDisplayName.trim();
+            if (!name) {
+                this.error = 'Please enter your name';
                 return;
             }
 
-            // New identity created — emit onboarding event
-            const identifierType = this.detectIdentifierType(this.otpIdentifier.trim());
-            this.needsOnboarding.emit({
-                auth_method: 'otp',
-                is_new_identity: true,
-                identity: {
-                    email: identifierType === 'email' ? this.otpNormalizedIdentifier : '',
-                    phone: identifierType === 'phone' ? this.otpNormalizedIdentifier : undefined,
-                    display_name: name,
-                },
-            });
-        } catch (err: any) {
-            this.error = err.message || 'Registration failed';
-        } finally {
-            this.loading = false;
-        }
+            this.loading = true;
+            this.error = '';
+
+            try {
+                const result = await this.auth.identityRegister(this.otpVerifiedToken, name);
+
+                if (!result.success) {
+                    // If token expired, restart OTP flow
+                    if (result.message?.includes('expired') || result.message?.includes('Invalid')) {
+                        this.error = 'Session expired. Please verify again.';
+                        this.otpStep = 'identifier';
+                        this.otpVerifiedToken = '';
+                        this.otpDisplayName = '';
+                        return;
+                    }
+                    this.error = result.message || 'Registration failed';
+                    return;
+                }
+
+                // New identity created — emit onboarding event
+                const identifierType = this.detectIdentifierType(this.otpIdentifier.trim());
+                this.needsOnboarding.emit({
+                    auth_method: 'otp',
+                    is_new_identity: true,
+                    identity: {
+                        email: identifierType === 'email' ? this.otpNormalizedIdentifier : '',
+                        phone: identifierType === 'phone' ? this.otpNormalizedIdentifier : undefined,
+                        display_name: name,
+                    },
+                });
+            } catch (err: any) {
+                this.error = err.message || 'Registration failed';
+            } finally {
+                this.loading = false;
+            }
+        });
     }
 
     /** Resend the OTP */
