@@ -53,7 +53,18 @@ export class ApiConnectionService {
 
     private handleError<DataType>(error: any): ApiResponse<DataType> {
         console.error(`Backend returned code ${error.status}, full error: `, error)
-        return new ApiResponse<DataType>('error')
+
+        // Preserve error metadata for proper classification
+        // Network errors (TypeError from fetch) have no status
+        // HTTP errors (Response) have status property
+        const errorMetadata: any = {
+            originalError: error,
+            isNetworkError: !(error instanceof Response) && (error instanceof TypeError || !error.status),
+            httpStatus: error instanceof Response ? error.status : (error.status || null),
+            url: error.url || null
+        };
+
+        return new ApiResponse<DataType>('error', errorMetadata, '')
     }
 
     async get<DataType>(endpoint: string, queryParamsObj?: any): Promise<ApiResponse<DataType>> {
