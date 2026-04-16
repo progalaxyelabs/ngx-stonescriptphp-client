@@ -45,26 +45,39 @@ export class ApiConnectionService {
                 this.signinStatus.signedOut()
             }
 
-            return this.handleError<DataType>(response)
+            return await this.handleError<DataType>(response, options.method || 'GET')
         } catch (error) {
-            return this.handleError<DataType>(error)
+            return await this.handleError<DataType>(error, options.method || 'GET')
         }
     }
 
-    private handleError<DataType>(error: any): ApiResponse<DataType> {
+    private async handleError<DataType>(error: any, method?: string): Promise<ApiResponse<DataType>> {
         console.error(`Backend returned code ${error.status}, full error: `, error)
+
+        // Read response body for HTTP errors
+        let responseBody: any = null;
+        if (error instanceof Response) {
+            try {
+                responseBody = await error.json();
+            } catch (e) {
+                // Response body isn't JSON or already consumed — log and continue
+                console.warn('Failed to parse error response as JSON:', e);
+            }
+        }
 
         // Preserve error metadata for proper classification
         // Network errors (TypeError from fetch) have no status
         // HTTP errors (Response) have status property
         const errorMetadata: any = {
             originalError: error,
+            responseBody,
             isNetworkError: !(error instanceof Response) && (error instanceof TypeError || !error.status),
             httpStatus: error instanceof Response ? error.status : (error.status || null),
-            url: error.url || null
+            url: error.url || null,
+            method: method || null
         };
 
-        return new ApiResponse<DataType>('error', errorMetadata, '')
+        return new ApiResponse<DataType>('error', errorMetadata, responseBody?.message || '')
     }
 
     async get<DataType>(endpoint: string, queryParamsObj?: any): Promise<ApiResponse<DataType>> {

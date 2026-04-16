@@ -31,9 +31,9 @@ export class ApiResponse<DataType> {
         return this
     }
 
-    onError(callback: () => void): ApiResponse<DataType> {
+    onError(callback: (data: DataType) => void): ApiResponse<DataType> {
         if (this.status === 'error') {
-            callback()
+            callback(this.data as DataType)
         }
         return this
     }
