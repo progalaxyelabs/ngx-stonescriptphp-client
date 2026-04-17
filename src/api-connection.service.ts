@@ -52,8 +52,6 @@ export class ApiConnectionService {
     }
 
     private async handleError<DataType>(error: any, method: string, requestUrl: string): Promise<ApiResponse<DataType>> {
-        console.error(`Backend returned code ${error.status}, full error: `, error)
-
         // Read response body for HTTP errors
         let responseBody: any = null;
         if (error instanceof Response) {
