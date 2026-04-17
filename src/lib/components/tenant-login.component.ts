@@ -153,8 +153,8 @@ export interface OnboardingNeededEvent {
                         </div>
                     }
 
-                    <!-- Divider before other providers -->
-                    @if (effectiveOauthProviders.length > 0 || isProviderEnabled('emailPassword')) {
+                    <!-- Divider before other providers (hidden during OTP code/register steps) -->
+                    @if ((effectiveOauthProviders.length > 0 || isProviderEnabled('emailPassword')) && otpStep === 'identifier') {
                         <div class="divider">
                             <span>OR</span>
                         </div>
@@ -205,8 +205,8 @@ export interface OnboardingNeededEvent {
                     }
                 }
 
-                <!-- OAuth Providers (always visible as alternative sign-in) -->
-                @if (effectiveOauthProviders.length > 0) {
+                <!-- OAuth Providers (hidden during OTP code/register steps to prevent concurrent auth sessions) -->
+                @if (effectiveOauthProviders.length > 0 && (!otpActive || otpStep === 'identifier')) {
                     <div class="oauth-buttons">
                         @for (provider of effectiveOauthProviders; track provider) {
                             <button
