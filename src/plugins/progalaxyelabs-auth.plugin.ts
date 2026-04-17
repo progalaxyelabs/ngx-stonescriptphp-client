@@ -331,6 +331,7 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                         authMethod: event.data.auth_method,
                         oauthProvider: event.data.oauth_provider,
                         identity: event.data.identity,
+                        user: this.toUser(event.data.identity),
                     });
                 } else if (event.data.type === 'oauth_error') {
                     resolve({ success: false, message: event.data.message || 'OAuth login failed' });
