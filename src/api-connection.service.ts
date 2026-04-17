@@ -45,13 +45,13 @@ export class ApiConnectionService {
                 this.signinStatus.signedOut()
             }
 
-            return await this.handleError<DataType>(response, options.method || 'GET')
+            return await this.handleError<DataType>(response, options.method || 'GET', url)
         } catch (error) {
-            return await this.handleError<DataType>(error, options.method || 'GET')
+            return await this.handleError<DataType>(error, options.method || 'GET', url)
         }
     }
 
-    private async handleError<DataType>(error: any, method?: string): Promise<ApiResponse<DataType>> {
+    private async handleError<DataType>(error: any, method: string, requestUrl: string): Promise<ApiResponse<DataType>> {
         console.error(`Backend returned code ${error.status}, full error: `, error)
 
         // Read response body for HTTP errors
@@ -68,12 +68,13 @@ export class ApiConnectionService {
         // Preserve error metadata for proper classification
         // Network errors (TypeError from fetch) have no status
         // HTTP errors (Response) have status property
+        // URL and method are captured BEFORE fetch runs so they're available for TypeError cases
         const errorMetadata: any = {
             originalError: error,
             responseBody,
             isNetworkError: !(error instanceof Response) && (error instanceof TypeError || !error.status),
             httpStatus: error instanceof Response ? error.status : (error.status || null),
-            url: error.url || null,
+            url: requestUrl || error.url || null,
             method: method || null
         };
 
