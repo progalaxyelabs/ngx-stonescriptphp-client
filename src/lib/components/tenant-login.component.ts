@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChildren, QueryList, ElementRef, NgZone, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChildren, QueryList, ElementRef, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, AuthProvider, AuthResult } from '../../auth.service';
@@ -8,6 +8,9 @@ import { TenantMembership } from '../../auth.plugin';
 export type { TenantMembership };
 
 export type OtpStep = 'identifier' | 'code' | 'register';
+
+/** Auth method mutex state — prevents concurrent auth flows */
+export type CommittedFlow = 'none' | 'otp' | 'oauth';
 
 export interface TenantSelectedEvent {
   tenantId: string;
@@ -33,45 +36,48 @@ export interface OnboardingNeededEvent {
     imports: [CommonModule, FormsModule],
     template: `
         <div class="tenant-login-dialog">
-            @if (!showingTenantSelector) {
+            @if (!showingTenantSelector()) {
                 <!-- Step 1: Authentication -->
                 <h2 class="login-title">{{ title }}</h2>
 
                 <!-- OTP Flow -->
-                @if (isProviderEnabled('otp') && otpActive) {
+                @if (isProviderEnabled('otp') && otpActive()) {
                     <!-- OTP Step 1: Identifier entry -->
-                    @if (otpStep === 'identifier') {
+                    @if (otpStep() === 'identifier') {
                         <form (ngSubmit)="onOtpSend()" class="otp-form">
-                            @if (otpIdentifierError) {
-                                <div [class]="'otp-identifier-error otp-identifier-error--' + otpIdentifierErrorColor">
-                                    {{ otpIdentifierError }}
+                            @if (otpIdentifierError()) {
+                                <div [class]="'otp-identifier-error otp-identifier-error--' + otpIdentifierErrorColor()">
+                                    {{ otpIdentifierError() }}
                                 </div>
                             }
                             <div class="form-group">
                                 <input
-                                    [(ngModel)]="otpIdentifier"
+                                    [ngModel]="otpIdentifierValue()"
+                                    (ngModelChange)="setOtpIdentifier($event)"
                                     name="otpIdentifier"
                                     [placeholder]="otpPlaceholderText"
                                     type="text"
                                     required
                                     autocomplete="email tel"
                                     class="form-control"
+                                    [disabled]="!canUseOtpForm()"
                                     (input)="onOtpIdentifierChange()">
-                                @if (otpIdentifierHint) {
-                                    <div class="field-hint">{{ otpIdentifierHint }}</div>
+                                @if (otpIdentifierHint()) {
+                                    <div class="field-hint">{{ otpIdentifierHint() }}</div>
                                 }
                             </div>
                             <button
                                 type="submit"
-                                [disabled]="loading || !otpIdentifier.trim()"
+                                [disabled]="loading() || !otpIdentifierValue().trim() || !canUseOtpForm()"
                                 class="btn btn-primary btn-block">
-                                {{ loading ? 'Sending...' : 'Send OTP' }}
+                                {{ loading() ? 'Sending...' : 'Send OTP' }}
                             </button>
-                            @if (error && otpIdentifier.trim()) {
+                            @if (error() && otpIdentifierValue().trim()) {
                                 <button
                                     type="button"
                                     class="btn btn-link btn-block otp-already-have"
-                                    (click)="onSkipToOtpEntry()">
+                                    (click)="onSkipToOtpEntry()"
+                                    [disabled]="!canUseOtpForm()">
                                     I already have an OTP
                                 </button>
                             }
@@ -79,21 +85,21 @@ export interface OnboardingNeededEvent {
                     }
 
                     <!-- OTP Step 2: Code entry -->
-                    @if (otpStep === 'code') {
+                    @if (otpStep() === 'code') {
                         <div class="otp-code-section">
                             <p class="otp-subtitle">
                                 Enter the 6-digit code sent to
-                                <strong>{{ otpMaskedIdentifier }}</strong>
+                                <strong>{{ otpMaskedIdentifier() }}</strong>
                             </p>
                             <div class="otp-digits">
-                                @for (digit of otpDigits; track $index; let i = $index) {
+                                @for (digit of otpDigits(); track $index; let i = $index) {
                                     <input
                                         #otpInput
                                         type="text"
                                         inputmode="numeric"
                                         maxlength="1"
                                         class="otp-digit-input"
-                                        [value]="otpDigits[i]"
+                                        [value]="otpDigits()[i]"
                                         (input)="onOtpDigitInput($event, i)"
                                         (keydown)="onOtpDigitKeydown($event, i)"
                                         (paste)="onOtpPaste($event)">
@@ -103,15 +109,15 @@ export interface OnboardingNeededEvent {
                                 <button
                                     type="button"
                                     (click)="onOtpVerify()"
-                                    [disabled]="loading || otpCode.length < 6"
+                                    [disabled]="loading() || otpCode.length < 6"
                                     class="btn btn-primary btn-block">
-                                    {{ loading ? 'Verifying...' : 'Verify' }}
+                                    {{ loading() ? 'Verifying...' : 'Verify' }}
                                 </button>
                             </div>
                             <div class="otp-resend">
-                                @if (otpResendCountdown > 0) {
+                                @if (otpResendCountdown() > 0) {
                                     <span class="resend-timer">
-                                        Resend in {{ formatCountdown(otpResendCountdown) }}
+                                        Resend in {{ formatCountdown(otpResendCountdown()) }}
                                     </span>
                                 } @else {
                                     <a href="#" (click)="onOtpResend($event)" class="resend-link">
@@ -128,7 +134,7 @@ export interface OnboardingNeededEvent {
                     }
 
                     <!-- OTP Step 3: Registration (new user) -->
-                    @if (otpStep === 'register') {
+                    @if (otpStep() === 'register') {
                         <div class="otp-register-section">
                             <p class="otp-subtitle">
                                 Welcome! Enter your name to get started.
@@ -136,7 +142,8 @@ export interface OnboardingNeededEvent {
                             <form (ngSubmit)="onOtpRegister()" class="otp-form">
                                 <div class="form-group">
                                     <input
-                                        [(ngModel)]="otpDisplayName"
+                                        [ngModel]="otpDisplayNameValue()"
+                                        (ngModelChange)="setOtpDisplayName($event)"
                                         name="displayName"
                                         placeholder="Your Name"
                                         type="text"
@@ -145,16 +152,16 @@ export interface OnboardingNeededEvent {
                                 </div>
                                 <button
                                     type="submit"
-                                    [disabled]="loading || !otpDisplayName.trim()"
+                                    [disabled]="loading() || !otpDisplayNameValue().trim()"
                                     class="btn btn-primary btn-block">
-                                    {{ loading ? 'Creating account...' : 'Continue' }}
+                                    {{ loading() ? 'Creating account...' : 'Continue' }}
                                 </button>
                             </form>
                         </div>
                     }
 
                     <!-- Divider before other providers (hidden during OTP code/register steps) -->
-                    @if ((effectiveOauthProviders.length > 0 || isProviderEnabled('emailPassword')) && otpStep === 'identifier') {
+                    @if ((effectiveOauthProviders().length > 0 || isProviderEnabled('emailPassword')) && otpStep() === 'identifier') {
                         <div class="divider">
                             <span>OR</span>
                         </div>
@@ -162,11 +169,12 @@ export interface OnboardingNeededEvent {
                 }
 
                 <!-- Email/Password Form (if enabled) -->
-                @if (isProviderEnabled('emailPassword') && !useOAuth && !otpActive) {
+                @if (isProviderEnabled('emailPassword') && !useOAuth() && !otpActive()) {
                     <form (ngSubmit)="onEmailLogin()" class="email-form">
                         <div class="form-group">
                             <input
-                                [(ngModel)]="email"
+                                [ngModel]="emailValue()"
+                                (ngModelChange)="setEmail($event)"
                                 name="email"
                                 placeholder="Email"
                                 type="email"
@@ -175,44 +183,45 @@ export interface OnboardingNeededEvent {
                         </div>
                         <div class="form-group password-group">
                             <input
-                                [(ngModel)]="password"
+                                [ngModel]="passwordValue()"
+                                (ngModelChange)="setPassword($event)"
                                 name="password"
                                 placeholder="Password"
-                                [type]="showPassword ? 'text' : 'password'"
+                                [type]="showPassword() ? 'text' : 'password'"
                                 required
                                 class="form-control password-input">
                             <button
                                 type="button"
                                 class="password-toggle"
-                                (click)="showPassword = !showPassword"
-                                [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'">
-                                {{ showPassword ? '&#x1F441;' : '&#x1F441;&#x200D;&#x1F5E8;' }}
+                                (click)="togglePasswordVisibility()"
+                                [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'">
+                                {{ showPassword() ? '&#x1F441;' : '&#x1F441;&#x200D;&#x1F5E8;' }}
                             </button>
                         </div>
                         <button
                             type="submit"
-                            [disabled]="loading"
+                            [disabled]="loading()"
                             class="btn btn-primary btn-block">
-                            {{ loading ? 'Signing in...' : 'Sign in with Email' }}
+                            {{ loading() ? 'Signing in...' : 'Sign in with Email' }}
                         </button>
                     </form>
 
                     <!-- Divider -->
-                    @if (effectiveOauthProviders.length > 0) {
+                    @if (effectiveOauthProviders().length > 0) {
                         <div class="divider">
                             <span>OR</span>
                         </div>
                     }
                 }
 
-                <!-- OAuth Providers (hidden during OTP code/register steps to prevent concurrent auth sessions) -->
-                @if (effectiveOauthProviders.length > 0 && (!otpActive || otpStep === 'identifier')) {
+                <!-- OAuth Providers (hidden when OTP flow is committed or during code/register steps) -->
+                @if (canShowOAuth()) {
                     <div class="oauth-buttons">
-                        @for (provider of effectiveOauthProviders; track provider) {
+                        @for (provider of effectiveOauthProviders(); track provider) {
                             <button
                                 type="button"
                                 (click)="onOAuthLogin(provider)"
-                                [disabled]="loading"
+                                [disabled]="loading()"
                                 [class]="'btn btn-oauth ' + getProviderCssClass(provider)"
                                 [ngStyle]="getProviderButtonStyle(provider)">
                                 @if (getProviderIcon(provider)) {
@@ -227,18 +236,18 @@ export interface OnboardingNeededEvent {
                 }
 
                 <!-- Switch between OAuth and Email/Password -->
-                @if (isProviderEnabled('emailPassword') && effectiveOauthProviders.length > 0 && !otpActive) {
+                @if (isProviderEnabled('emailPassword') && effectiveOauthProviders().length > 0 && !otpActive()) {
                     <div class="switch-method">
                         <a href="#" (click)="toggleAuthMethod($event)">
-                            {{ useOAuth ? 'Use email/password instead' : 'Use OAuth instead' }}
+                            {{ useOAuth() ? 'Use email/password instead' : 'Use OAuth instead' }}
                         </a>
                     </div>
                 }
 
                 <!-- Error Message -->
-                @if (error) {
+                @if (error()) {
                     <div class="error-message">
-                        {{ error }}
+                        {{ error() }}
                     </div>
                 }
 
@@ -253,24 +262,24 @@ export interface OnboardingNeededEvent {
                 <!-- Step 2: Tenant Selection -->
                 <h2 class="login-title">{{ tenantSelectorTitle }}</h2>
 
-                @if (userName) {
+                @if (userName()) {
                     <div class="welcome-message">
-                        Welcome back, <strong>{{ userName }}</strong>!
+                        Welcome back, <strong>{{ userName() }}</strong>!
                     </div>
                 }
 
                 <p class="selector-description">{{ tenantSelectorDescription }}</p>
 
                 <div class="tenant-list">
-                    @for (membership of memberships; track membership.tenant_id) {
+                    @for (membership of memberships(); track membership.tenant_id) {
                         <div
                             class="tenant-item"
-                            [class.selected]="selectedTenantId === membership.tenant_id"
+                            [class.selected]="selectedTenantId() === membership.tenant_id"
                             (click)="selectTenantItem(membership.tenant_id)">
                             <div class="tenant-radio">
                                 <input
                                     type="radio"
-                                    [checked]="selectedTenantId === membership.tenant_id"
+                                    [checked]="selectedTenantId() === membership.tenant_id"
                                     [name]="'tenant-' + membership.tenant_id"
                                     [id]="'tenant-' + membership.tenant_id">
                             </div>
@@ -293,15 +302,15 @@ export interface OnboardingNeededEvent {
                 <button
                     type="button"
                     (click)="onContinueWithTenant()"
-                    [disabled]="!selectedTenantId || loading"
+                    [disabled]="!selectedTenantId() || loading()"
                     class="btn btn-primary btn-block">
-                    {{ loading ? 'Loading...' : continueButtonText }}
+                    {{ loading() ? 'Loading...' : continueButtonText }}
                 </button>
 
                 <!-- Error Message -->
-                @if (error) {
+                @if (error()) {
                     <div class="error-message">
-                        {{ error }}
+                        {{ error() }}
                     </div>
                 }
 
@@ -315,7 +324,7 @@ export interface OnboardingNeededEvent {
             }
 
             <!-- Loading Overlay -->
-            @if (loading) {
+            @if (loading()) {
                 <div class="loading-overlay">
                     <div class="spinner"></div>
                 </div>
@@ -372,6 +381,11 @@ export interface OnboardingNeededEvent {
             border-radius: 4px;
             font-size: 14px;
             box-sizing: border-box;
+        }
+
+        .form-control:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
         }
 
         .password-input {
@@ -766,14 +780,14 @@ export interface OnboardingNeededEvent {
 export class TenantLoginComponent implements OnInit, OnDestroy {
     @ViewChildren('otpInput') otpInputs!: QueryList<ElementRef<HTMLInputElement>>;
 
-    // Component Configuration
+    // Component Configuration (static inputs)
     @Input() title: string = 'Sign In';
     @Input() providers: AuthProvider[] = ['google'];
     @Input() showTenantSelector: boolean = true;
     @Input() autoSelectSingleTenant: boolean = true;
-    @Input() prefillEmail?: string;  // Email to prefill (for account linking flow)
+    @Input() prefillEmail?: string;
     @Input() allowTenantCreation: boolean = true;
-    @Input() otpIdentifierTypes: ('email' | 'phone')[] = ['email', 'phone'];  // Allowed OTP identifier types
+    @Input() otpIdentifierTypes: ('email' | 'phone')[] = ['email', 'phone'];
 
     // Tenant Selector Labels
     @Input() tenantSelectorTitle: string = 'Select Organization';
@@ -791,54 +805,80 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     @Output() needsOnboarding = new EventEmitter<OnboardingNeededEvent>();
     @Output() createTenant = new EventEmitter<void>();
 
-    // Form Fields
-    email = '';
-    password = '';
+    // ── Signals: Form Fields ────────────────────────────────────────────────────
+    private readonly _email = signal('');
+    private readonly _password = signal('');
 
-    // State
-    error = '';
-    loading = false;
-    showPassword = false;
-    useOAuth = true;
-    oauthProviders: AuthProvider[] = [];
+    // ── Signals: UI State ───────────────────────────────────────────────────────
+    readonly error = signal('');
+    readonly loading = signal(false);
+    readonly showPassword = signal(false);
+    readonly useOAuth = signal(true);
+    private oauthProviders: AuthProvider[] = [];
+    readonly effectiveOauthProviders = signal<AuthProvider[]>([]);
 
-    // Effective OAuth providers (filtered for Android WebView)
-    effectiveOauthProviders: AuthProvider[] = [];
+    // ── Signals: Auth Method Mutex (journey-seam fix) ───────────────────────────
+    readonly committedFlow = signal<CommittedFlow>('none');
 
-    // OTP State
-    otpActive = false;
-    otpStep: OtpStep = 'identifier';
-    otpIdentifier = '';
-    otpIdentifierHint = '';
-    otpIdentifierError = '';
-    otpIdentifierErrorColor: 'orange' | 'red' = 'red';
-    otpNormalizedIdentifier = '';  // E.164 for phone, as-is for email
-    otpMaskedIdentifier = '';
-    otpDigits: string[] = ['', '', '', '', '', ''];
-    otpVerifiedToken = '';
-    otpDisplayName = '';
-    otpResendCountdown = 0;
+    // ── Signals: OTP State ──────────────────────────────────────────────────────
+    readonly otpActive = signal(false);
+    readonly otpStep = signal<OtpStep>('identifier');
+    private readonly _otpIdentifier = signal('');
+    readonly otpIdentifierHint = signal('');
+    readonly otpIdentifierError = signal('');
+    readonly otpIdentifierErrorColor = signal<'orange' | 'red'>('red');
+    private readonly _otpNormalizedIdentifier = signal('');
+    readonly otpMaskedIdentifier = signal('');
+    readonly otpDigits = signal<string[]>(['', '', '', '', '', '']);
+    private readonly _otpVerifiedToken = signal('');
+    private readonly _otpDisplayName = signal('');
+    readonly otpResendCountdown = signal(0);
     private otpResendTimer: ReturnType<typeof setInterval> | null = null;
 
     // Android WebView detection
     private isAndroidWebView = false;
 
-    // Tenant Selection State
-    showingTenantSelector = false;
-    memberships: TenantMembership[] = [];
-    selectedTenantId: string | null = null;
-    userName: string = '';
+    // ── Signals: Tenant Selection State ─────────────────────────────────────────
+    readonly showingTenantSelector = signal(false);
+    readonly memberships = signal<TenantMembership[]>([]);
+    readonly selectedTenantId = signal<string | null>(null);
+    readonly userName = signal('');
+
+    // ── Computed: Auth Method Mutex Guards ──────────────────────────────────────
+    /**
+     * OAuth buttons are visible when:
+     * - There are OAuth providers configured
+     * - User hasn't committed to OTP flow
+     * - OTP step is at identifier entry (or OTP not active)
+     */
+    readonly canShowOAuth = computed(() =>
+        this.effectiveOauthProviders().length > 0 &&
+        this.committedFlow() !== 'otp' &&
+        (!this.otpActive() || this.otpStep() === 'identifier')
+    );
+
+    /**
+     * OTP form is enabled when:
+     * - User hasn't committed to OAuth flow
+     */
+    readonly canUseOtpForm = computed(() =>
+        this.committedFlow() !== 'oauth'
+    );
+
+    // ── Signal value getters (for ngModel binding) ──────────────────────────────
+    readonly emailValue = computed(() => this._email());
+    readonly passwordValue = computed(() => this._password());
+    readonly otpIdentifierValue = computed(() => this._otpIdentifier());
+    readonly otpDisplayNameValue = computed(() => this._otpDisplayName());
 
     constructor(
         private auth: AuthService,
-        private providerRegistry: ProviderRegistryService,
-        private zone: NgZone,
-        private cdr: ChangeDetectorRef
+        private providerRegistry: ProviderRegistryService
     ) {}
 
     ngOnInit() {
         if (!this.providers || this.providers.length === 0) {
-            this.error = 'Configuration Error: No authentication providers specified.';
+            this.error.set('Configuration Error: No authentication providers specified.');
             throw new Error('TenantLoginComponent requires providers input.');
         }
 
@@ -849,30 +889,52 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         this.oauthProviders = this.providers.filter(p => p !== 'emailPassword' && p !== 'otp');
 
         // Auto-hide Google on Android WebView
-        this.effectiveOauthProviders = this.isAndroidWebView
+        const filteredProviders = this.isAndroidWebView
             ? this.oauthProviders.filter(p => p !== 'google')
             : [...this.oauthProviders];
+        this.effectiveOauthProviders.set(filteredProviders);
 
         // If OTP is configured, it becomes the primary login method
         if (this.isProviderEnabled('otp')) {
-            this.otpActive = true;
+            this.otpActive.set(true);
         }
 
         // If only emailPassword is available (no OTP, no OAuth), use it by default
-        if (!this.otpActive && this.effectiveOauthProviders.length === 0 && this.isProviderEnabled('emailPassword')) {
-            this.useOAuth = false;
+        if (!this.otpActive() && this.effectiveOauthProviders().length === 0 && this.isProviderEnabled('emailPassword')) {
+            this.useOAuth.set(false);
         }
 
         // Prefill email if provided (for account linking flow)
         if (this.prefillEmail) {
-            this.email = this.prefillEmail;
-            this.useOAuth = false;
-            this.otpActive = false;  // Switch to email/password form for linking
+            this._email.set(this.prefillEmail);
+            this.useOAuth.set(false);
+            this.otpActive.set(false);
         }
     }
 
     ngOnDestroy() {
         this.clearResendTimer();
+    }
+
+    // ── Signal setters (for ngModel two-way binding) ────────────────────────────
+    setEmail(value: string) {
+        this._email.set(value);
+    }
+
+    setPassword(value: string) {
+        this._password.set(value);
+    }
+
+    setOtpIdentifier(value: string) {
+        this._otpIdentifier.set(value);
+    }
+
+    setOtpDisplayName(value: string) {
+        this._otpDisplayName.set(value);
+    }
+
+    togglePasswordVisibility() {
+        this.showPassword.update(v => !v);
     }
 
     isProviderEnabled(provider: AuthProvider): boolean {
@@ -897,45 +959,51 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
 
     toggleAuthMethod(event: Event) {
         event.preventDefault();
-        this.useOAuth = !this.useOAuth;
-        this.error = '';
+        this.useOAuth.update(v => !v);
+        this.error.set('');
     }
 
     async onEmailLogin() {
-        if (!this.email || !this.password) {
-            this.error = 'Please enter email and password';
+        const email = this._email();
+        const password = this._password();
+
+        if (!email || !password) {
+            this.error.set('Please enter email and password');
             return;
         }
 
-        this.loading = true;
-        this.error = '';
+        this.loading.set(true);
+        this.error.set('');
 
         try {
-            const result = await this.auth.loginWithEmail(this.email, this.password);
+            const result = await this.auth.loginWithEmail(email, password);
 
             if (!result.success) {
-                this.error = result.message || 'Login failed';
+                this.error.set(result.message || 'Login failed');
                 return;
             }
 
-            // Authentication successful — pass result so membership can be reused
             await this.handlePostAuthFlow(result);
         } catch (err: any) {
-            this.error = err.message || 'An unexpected error occurred';
+            this.error.set(err.message || 'An unexpected error occurred');
         } finally {
-            this.loading = false;
+            this.loading.set(false);
         }
     }
 
     async onOAuthLogin(provider: AuthProvider) {
-        this.loading = true;
-        this.error = '';
+        // Commit to OAuth flow — disable OTP inputs
+        this.committedFlow.set('oauth');
+        this.loading.set(true);
+        this.error.set('');
 
         try {
             const result = await this.auth.loginWithProvider(provider);
 
             if (!result.success) {
-                this.error = result.message || 'OAuth login failed';
+                this.error.set(result.message || 'OAuth login failed');
+                // OAuth failed/cancelled — reset mutex
+                this.committedFlow.set('none');
                 return;
             }
 
@@ -956,23 +1024,24 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
 
             // Multi-tenant selection — user has multiple memberships
             if (result.memberships && result.memberships.length > 0) {
-                this.memberships = result.memberships;
-                this.showingTenantSelector = true;
+                this.memberships.set(result.memberships);
+                this.showingTenantSelector.set(true);
                 return;
             }
 
-            // Standard success — pass result so membership can be reused if present
+            // Standard success
             await this.handlePostAuthFlow(result);
         } catch (err: any) {
-            this.error = err.message || 'An unexpected error occurred';
+            this.error.set(err.message || 'An unexpected error occurred');
+            // OAuth failed — reset mutex
+            this.committedFlow.set('none');
         } finally {
-            this.loading = false;
+            this.loading.set(false);
         }
     }
 
     async handlePostAuthFlow(loginResult?: AuthResult) {
         if (!this.showTenantSelector) {
-            // Tenant selection is disabled, emit event immediately
             this.tenantSelected.emit({
                 tenantId: '',
                 tenantSlug: '',
@@ -981,72 +1050,64 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
             return;
         }
 
-        // Resolve memberships — prefer data from login response to avoid extra API call
-        this.loading = true;
+        this.loading.set(true);
 
         try {
-            let memberships: TenantMembership[];
+            let membershipList: TenantMembership[];
 
             if (loginResult?.membership) {
-                // Login response already included membership — use it directly
-                memberships = [loginResult.membership];
+                membershipList = [loginResult.membership];
             } else {
-                // Fall back to fetching memberships from API (with platform_code param)
                 const result = await this.auth.getTenantMemberships();
-                memberships = result.memberships;
+                membershipList = result.memberships;
             }
 
-            if (!memberships || memberships.length === 0) {
-                // User has no tenants, prompt to create one
-                this.error = 'You are not a member of any organization. Please create one.';
+            if (!membershipList || membershipList.length === 0) {
+                this.error.set('You are not a member of any organization. Please create one.');
                 if (this.allowTenantCreation) {
                     setTimeout(() => this.createTenant.emit(), 2000);
                 }
                 return;
             }
 
-            this.memberships = memberships;
+            this.memberships.set(membershipList);
 
-            // Get user name if available
             const currentUser = this.auth.getCurrentUser();
             if (currentUser) {
-                this.userName = currentUser.display_name || currentUser.email;
+                this.userName.set(currentUser.display_name || currentUser.email);
             }
 
-            // Auto-select if user has only one tenant
-            if (this.memberships.length === 1 && this.autoSelectSingleTenant) {
-                const m = this.memberships[0];
-                // If login already returned a tenant-scoped token (via membership in response),
-                // just emit — no need to call select-tenant again.
+            if (membershipList.length === 1 && this.autoSelectSingleTenant) {
+                const m = membershipList[0];
                 if (loginResult?.membership) {
                     this.tenantSelected.emit({ tenantId: m.tenant_id, tenantSlug: m.slug, role: m.role });
                     return;
                 }
                 await this.selectAndContinue(m);
             } else {
-                // Show tenant selector
-                this.showingTenantSelector = true;
+                this.showingTenantSelector.set(true);
             }
         } catch (err: any) {
-            this.error = err.message || 'Failed to load organizations';
+            this.error.set(err.message || 'Failed to load organizations');
         } finally {
-            this.loading = false;
+            this.loading.set(false);
         }
     }
 
     selectTenantItem(tenantId: string) {
-        this.selectedTenantId = tenantId;
+        this.selectedTenantId.set(tenantId);
     }
 
     async onContinueWithTenant() {
-        if (!this.selectedTenantId) {
-            this.error = 'Please select an organization';
+        const tenantId = this.selectedTenantId();
+        if (!tenantId) {
+            this.error.set('Please select an organization');
             return;
         }
 
-        const membership = this.memberships.find(m => m.tenant_id === this.selectedTenantId);
+        const membership = this.memberships().find(m => m.tenant_id === tenantId);
         if (!membership) {
-            this.error = 'Selected organization not found';
+            this.error.set('Selected organization not found');
             return;
         }
 
@@ -1054,247 +1115,230 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     }
 
     async selectAndContinue(membership: TenantMembership) {
-        this.loading = true;
-        this.error = '';
+        this.loading.set(true);
+        this.error.set('');
 
         try {
             const result = await this.auth.selectTenant(membership.tenant_id);
 
             if (!result.success) {
-                this.error = result.message || 'Failed to select organization';
+                this.error.set(result.message || 'Failed to select organization');
                 return;
             }
 
-            // Emit tenant selected event
             this.tenantSelected.emit({
                 tenantId: membership.tenant_id,
                 tenantSlug: membership.slug,
                 role: membership.role
             });
         } catch (err: any) {
-            this.error = err.message || 'An unexpected error occurred';
+            this.error.set(err.message || 'An unexpected error occurred');
         } finally {
-            this.loading = false;
+            this.loading.set(false);
         }
     }
 
     // ── OTP methods ────────────────────────────────────────────────────────────
 
-    /** Detect identifier type from input and show hint */
+    /** Detect identifier type from input and show hint; commit to OTP flow on valid input */
     onOtpIdentifierChange() {
-        const value = this.otpIdentifier.trim();
+        const value = this._otpIdentifier().trim();
         if (!value) {
-            this.otpIdentifierHint = '';
+            this.otpIdentifierHint.set('');
+            // Empty input — reset mutex if still at identifier step
+            if (this.otpStep() === 'identifier' && this.committedFlow() === 'otp') {
+                this.committedFlow.set('none');
+            }
             return;
         }
+
         const detected = this.detectIdentifierType(value);
         if (detected === 'email') {
-            this.otpIdentifierHint = 'OTP will be sent to this email';
+            this.otpIdentifierHint.set('OTP will be sent to this email');
+            // Valid email format — commit to OTP flow
+            this.committedFlow.set('otp');
         } else if (detected === 'phone') {
             const digits = value.replace(/\D/g, '');
             if (digits.length === 10) {
-                this.otpIdentifierHint = 'OTP will be sent to +91 ' + digits;
+                this.otpIdentifierHint.set('OTP will be sent to +91 ' + digits);
             } else {
-                this.otpIdentifierHint = 'OTP will be sent to this number';
+                this.otpIdentifierHint.set('OTP will be sent to this number');
             }
+            // Valid phone format — commit to OTP flow
+            this.committedFlow.set('otp');
         } else {
-            this.otpIdentifierHint = '';
+            this.otpIdentifierHint.set('');
+            // Invalid format — don't commit yet
         }
     }
 
     /** Send OTP to the entered identifier */
     async onOtpSend() {
-        // Wrap in NgZone so post-await state mutations trigger change detection.
-        // The underlying AuthService plugin uses raw fetch() which is NOT patched
-        // by the default zone.js polyfill, so awaited continuations would otherwise
-        // run outside NgZone and skip CD entirely. See #2227.
-        return this.zone.run(async () => {
-            const raw = this.otpIdentifier.trim();
-            if (!raw) {
-                this.error = `Please enter your ${this.otpIdentifierName}`;
+        const raw = this._otpIdentifier().trim();
+        if (!raw) {
+            this.error.set(`Please enter your ${this.otpIdentifierName}`);
+            return;
+        }
+
+        const type = this.detectIdentifierType(raw);
+        if (!type) {
+            this.error.set(`Please enter a valid ${this.otpIdentifierName}`);
+            return;
+        }
+
+        // Normalize: auto-prepend +91 for 10-digit Indian numbers
+        if (type === 'phone') {
+            const digits = raw.replace(/\D/g, '');
+            this._otpNormalizedIdentifier.set(digits.length === 10 ? `+91${digits}` : `+${digits}`);
+        } else {
+            this._otpNormalizedIdentifier.set(raw);
+        }
+
+        // Commit to OTP flow
+        this.committedFlow.set('otp');
+        this.loading.set(true);
+        this.error.set('');
+        this.otpIdentifierError.set('');
+
+        try {
+            const result = await this.auth.sendOtp(this._otpNormalizedIdentifier());
+            if (!result.success) {
+                this.error.set('Failed to send OTP. Please try again.');
                 return;
             }
+            this.otpMaskedIdentifier.set(result.masked_identifier);
+            this.otpDigits.set(['', '', '', '', '', '']);
+            this.otpStep.set('code');
+            this.startResendCountdown(result.resend_after || 60);
 
-            const type = this.detectIdentifierType(raw);
-            if (!type) {
-                this.error = `Please enter a valid ${this.otpIdentifierName}`;
-                return;
-            }
-
-            // Normalize: auto-prepend +91 for 10-digit Indian numbers
-            if (type === 'phone') {
-                const digits = raw.replace(/\D/g, '');
-                this.otpNormalizedIdentifier = digits.length === 10 ? `+91${digits}` : `+${digits}`;
-            } else {
-                this.otpNormalizedIdentifier = raw;
-            }
-
-            this.loading = true;
-            this.error = '';
-            this.otpIdentifierError = '';
-
-            try {
-                const result = await this.auth.sendOtp(this.otpNormalizedIdentifier);
-                if (!result.success) {
-                    this.error = 'Failed to send OTP. Please try again.';
-                    return;
-                }
-                this.otpMaskedIdentifier = result.masked_identifier;
-                this.otpDigits = ['', '', '', '', '', ''];
-                this.otpStep = 'code';
-                this.startResendCountdown(result.resend_after || 60);
-
-                // Focus first digit input after view update
-                setTimeout(() => this.focusOtpInput(0), 50);
-            } catch (err: any) {
-                this.error = err.message || 'Failed to send OTP';
-            } finally {
-                this.loading = false;
-                // Explicit CD tick — zone.run's sync frame has already exited by the time
-                // post-await continuations run, so NgZone microtask tracking can't be relied
-                // on when the underlying plugin uses raw fetch(). See #2227.
-                this.cdr.detectChanges();
-            }
-        });
+            // Focus first digit input after view update
+            setTimeout(() => this.focusOtpInput(0), 50);
+        } catch (err: any) {
+            this.error.set(err.message || 'Failed to send OTP');
+        } finally {
+            this.loading.set(false);
+        }
     }
 
     /** Skip to OTP code entry when user already has a code */
     onSkipToOtpEntry(): void {
-        this.error = '';
-        this.otpMaskedIdentifier = this.otpIdentifier;
-        this.otpDigits = ['', '', '', '', '', ''];
-        this.otpStep = 'code';
+        this.error.set('');
+        this.otpMaskedIdentifier.set(this._otpIdentifier());
+        this.otpDigits.set(['', '', '', '', '', '']);
+        this.otpStep.set('code');
+        // Commit to OTP flow
+        this.committedFlow.set('otp');
         setTimeout(() => this.focusOtpInput(0), 50);
     }
 
     /** Verify the entered OTP code */
     async onOtpVerify() {
-        // Wrap in NgZone so post-await state mutations trigger change detection.
-        // The underlying AuthService plugin uses raw fetch() which is NOT patched
-        // by the default zone.js polyfill, so awaited continuations would otherwise
-        // run outside NgZone and skip CD entirely. See #2227.
-        return this.zone.run(async () => {
-            if (this.loading) return;
+        if (this.loading()) return;
 
-            const code = this.otpCode;
-            if (code.length < 6) {
-                this.error = 'Please enter the complete 6-digit code';
+        const code = this.otpCode;
+        if (code.length < 6) {
+            this.error.set('Please enter the complete 6-digit code');
+            return;
+        }
+
+        this.loading.set(true);
+        this.error.set('');
+
+        try {
+            const verifyResult = await this.auth.verifyOtp(this._otpNormalizedIdentifier(), code);
+            if (!verifyResult.success) {
+                switch (verifyResult.error) {
+                    case 'otp_expired':
+                        this.resetToIdentifierStep('Your code has expired. Please request a new one.', 'orange');
+                        break;
+                    case 'otp_invalid': {
+                        const attempts = verifyResult.remaining_attempts;
+                        this.error.set(attempts !== undefined
+                            ? `Invalid code. ${attempts} attempt${attempts === 1 ? '' : 's'} remaining.`
+                            : 'Invalid code. Please try again.');
+                        break;
+                    }
+                    case 'otp_rate_limited':
+                        this.resetToIdentifierStep('Too many attempts. Please try again later.', 'red');
+                        break;
+                    case 'otp_not_found':
+                        this.resetToIdentifierStep('No code found. Please request a new one.', 'orange');
+                        break;
+                    default:
+                        this.error.set(verifyResult.message || 'Invalid code. Please try again.');
+                }
                 return;
             }
 
-            this.loading = true;
-            this.error = '';
+            this._otpVerifiedToken.set(verifyResult.verified_token);
 
-            try {
-                const verifyResult = await this.auth.verifyOtp(this.otpNormalizedIdentifier, code);
-                if (!verifyResult.success) {
-                    switch (verifyResult.error) {
-                        case 'otp_expired':
-                            this.resetToIdentifierStep('Your code has expired. Please request a new one.', 'orange');
-                            break;
-                        case 'otp_invalid': {
-                            const attempts = verifyResult.remaining_attempts;
-                            this.error = attempts !== undefined
-                                ? `Invalid code. ${attempts} attempt${attempts === 1 ? '' : 's'} remaining.`
-                                : 'Invalid code. Please try again.';
-                            break;
-                        }
-                        case 'otp_rate_limited':
-                            this.resetToIdentifierStep('Too many attempts. Please try again later.', 'red');
-                            break;
-                        case 'otp_not_found':
-                            this.resetToIdentifierStep('No code found. Please request a new one.', 'orange');
-                            break;
-                        default:
-                            this.error = verifyResult.message || 'Invalid code. Please try again.';
-                    }
-                    return;
-                }
+            // Auto-attempt login
+            const loginResult = await this.auth.identityLogin(this._otpVerifiedToken());
 
-                this.otpVerifiedToken = verifyResult.verified_token;
-
-                // Auto-attempt login
-                const loginResult = await this.auth.identityLogin(this.otpVerifiedToken);
-
-                if (loginResult.success) {
-                    // Existing user — proceed with standard post-auth flow
-                    await this.handlePostAuthFlow(loginResult);
-                    return;
-                }
-
-                if (loginResult.message === 'identity_not_found') {
-                    // New user — show registration form
-                    this.otpStep = 'register';
-                    return;
-                }
-
-                // Other login error
-                this.error = loginResult.message || 'Login failed. Please try again.';
-            } catch (err: any) {
-                this.error = err.message || 'Verification failed';
-            } finally {
-                this.loading = false;
-                // Explicit CD tick — zone.run's sync frame has already exited by the time
-                // post-await continuations run, so NgZone microtask tracking can't be relied
-                // on when the underlying plugin uses raw fetch(). See #2227.
-                this.cdr.detectChanges();
+            if (loginResult.success) {
+                // Existing user — proceed with standard post-auth flow
+                await this.handlePostAuthFlow(loginResult);
+                return;
             }
-        });
+
+            if (loginResult.message === 'identity_not_found') {
+                // New user — show registration form
+                this.otpStep.set('register');
+                return;
+            }
+
+            // Other login error
+            this.error.set(loginResult.message || 'Login failed. Please try again.');
+        } catch (err: any) {
+            this.error.set(err.message || 'Verification failed');
+        } finally {
+            this.loading.set(false);
+        }
     }
 
     /** Register a new identity after OTP verification */
     async onOtpRegister() {
-        // Wrap in NgZone so post-await state mutations trigger change detection.
-        // The underlying AuthService plugin uses raw fetch() which is NOT patched
-        // by the default zone.js polyfill, so awaited continuations would otherwise
-        // run outside NgZone and skip CD entirely. See #2227.
-        return this.zone.run(async () => {
-            const name = this.otpDisplayName.trim();
-            if (!name) {
-                this.error = 'Please enter your name';
+        const name = this._otpDisplayName().trim();
+        if (!name) {
+            this.error.set('Please enter your name');
+            return;
+        }
+
+        this.loading.set(true);
+        this.error.set('');
+
+        try {
+            const result = await this.auth.identityRegister(this._otpVerifiedToken(), name);
+
+            if (!result.success) {
+                // If token expired, restart OTP flow
+                if (result.message?.includes('expired') || result.message?.includes('Invalid')) {
+                    this.error.set('Session expired. Please verify again.');
+                    this.otpStep.set('identifier');
+                    this._otpVerifiedToken.set('');
+                    this._otpDisplayName.set('');
+                    return;
+                }
+                this.error.set(result.message || 'Registration failed');
                 return;
             }
 
-            this.loading = true;
-            this.error = '';
-
-            try {
-                const result = await this.auth.identityRegister(this.otpVerifiedToken, name);
-
-                if (!result.success) {
-                    // If token expired, restart OTP flow
-                    if (result.message?.includes('expired') || result.message?.includes('Invalid')) {
-                        this.error = 'Session expired. Please verify again.';
-                        this.otpStep = 'identifier';
-                        this.otpVerifiedToken = '';
-                        this.otpDisplayName = '';
-                        return;
-                    }
-                    this.error = result.message || 'Registration failed';
-                    return;
-                }
-
-                // New identity created — emit onboarding event
-                const identifierType = this.detectIdentifierType(this.otpIdentifier.trim());
-                this.needsOnboarding.emit({
-                    auth_method: 'otp',
-                    is_new_identity: true,
-                    identity: {
-                        email: identifierType === 'email' ? this.otpNormalizedIdentifier : '',
-                        phone: identifierType === 'phone' ? this.otpNormalizedIdentifier : undefined,
-                        display_name: name,
-                    },
-                });
-            } catch (err: any) {
-                this.error = err.message || 'Registration failed';
-            } finally {
-                this.loading = false;
-                // Explicit CD tick — zone.run's sync frame has already exited by the time
-                // post-await continuations run, so NgZone microtask tracking can't be relied
-                // on when the underlying plugin uses raw fetch(). See #2227.
-                this.cdr.detectChanges();
-            }
-        });
+            // New identity created — emit onboarding event
+            const identifierType = this.detectIdentifierType(this._otpIdentifier().trim());
+            this.needsOnboarding.emit({
+                auth_method: 'otp',
+                is_new_identity: true,
+                identity: {
+                    email: identifierType === 'email' ? this._otpNormalizedIdentifier() : '',
+                    phone: identifierType === 'phone' ? this._otpNormalizedIdentifier() : undefined,
+                    display_name: name,
+                },
+            });
+        } catch (err: any) {
+            this.error.set(err.message || 'Registration failed');
+        } finally {
+            this.loading.set(false);
+        }
     }
 
     /** Resend the OTP */
@@ -1306,12 +1350,14 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     /** Go back to identifier entry */
     onOtpBack(event: Event) {
         event.preventDefault();
-        this.otpStep = 'identifier';
-        this.otpDigits = ['', '', '', '', '', ''];
-        this.otpVerifiedToken = '';
-        this.error = '';
-        this.otpIdentifierError = '';
+        this.otpStep.set('identifier');
+        this.otpDigits.set(['', '', '', '', '', '']);
+        this._otpVerifiedToken.set('');
+        this.error.set('');
+        this.otpIdentifierError.set('');
         this.clearResendTimer();
+        // Reset mutex — user can choose OAuth again
+        this.committedFlow.set('none');
     }
 
     /**
@@ -1320,13 +1366,14 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
      * (expired, rate-limited, not-found). Keeps the identifier pre-filled.
      */
     private resetToIdentifierStep(message: string, color: 'orange' | 'red') {
-        this.otpStep = 'identifier';
-        this.otpDigits = ['', '', '', '', '', ''];
-        this.otpVerifiedToken = '';
-        this.error = '';
+        this.otpStep.set('identifier');
+        this.otpDigits.set(['', '', '', '', '', '']);
+        this._otpVerifiedToken.set('');
+        this.error.set('');
         this.clearResendTimer();
-        this.otpIdentifierError = message;
-        this.otpIdentifierErrorColor = color;
+        this.otpIdentifierError.set(message);
+        this.otpIdentifierErrorColor.set(color);
+        // Keep committedFlow as 'otp' since identifier is still filled
     }
 
     // ── OTP digit input handling ─────────────────────────────────────────────
@@ -1334,8 +1381,10 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     onOtpDigitInput(event: Event, index: number) {
         const input = event.target as HTMLInputElement;
         const value = input.value.replace(/\D/g, '');
-        this.otpDigits[index] = value ? value[0] : '';
-        input.value = this.otpDigits[index];
+        const currentDigits = [...this.otpDigits()];
+        currentDigits[index] = value ? value[0] : '';
+        this.otpDigits.set(currentDigits);
+        input.value = currentDigits[index];
 
         // Auto-advance to next input
         if (value && index < 5) {
@@ -1349,7 +1398,7 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     }
 
     onOtpDigitKeydown(event: KeyboardEvent, index: number) {
-        if (event.key === 'Backspace' && !this.otpDigits[index] && index > 0) {
+        if (event.key === 'Backspace' && !this.otpDigits()[index] && index > 0) {
             this.focusOtpInput(index - 1);
         }
     }
@@ -1357,14 +1406,17 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     onOtpPaste(event: ClipboardEvent) {
         event.preventDefault();
         const pasted = (event.clipboardData?.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+        const newDigits = ['', '', '', '', '', ''];
         for (let i = 0; i < 6; i++) {
-            this.otpDigits[i] = pasted[i] || '';
+            newDigits[i] = pasted[i] || '';
         }
+        this.otpDigits.set(newDigits);
+
         // Update all input elements
         const inputs = this.otpInputs?.toArray();
         if (inputs) {
             for (let i = 0; i < 6; i++) {
-                inputs[i].nativeElement.value = this.otpDigits[i];
+                inputs[i].nativeElement.value = newDigits[i];
             }
         }
         if (pasted.length >= 6) {
@@ -1375,7 +1427,7 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     }
 
     get otpCode(): string {
-        return this.otpDigits.join('');
+        return this.otpDigits().join('');
     }
 
     get otpPlaceholderText(): string {
@@ -1413,7 +1465,6 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         const allowsPhone = this.otpIdentifierTypes.includes('phone');
 
         if (value.includes('@')) {
-            // Basic email validation
             const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
             return (isValidEmail && allowsEmail) ? 'email' : null;
         }
@@ -1434,10 +1485,10 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
 
     private startResendCountdown(seconds: number) {
         this.clearResendTimer();
-        this.otpResendCountdown = seconds;
+        this.otpResendCountdown.set(seconds);
         this.otpResendTimer = setInterval(() => {
-            this.otpResendCountdown--;
-            if (this.otpResendCountdown <= 0) {
+            this.otpResendCountdown.update(v => v - 1);
+            if (this.otpResendCountdown() <= 0) {
                 this.clearResendTimer();
             }
         }, 1000);
@@ -1448,7 +1499,7 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
             clearInterval(this.otpResendTimer);
             this.otpResendTimer = null;
         }
-        this.otpResendCountdown = 0;
+        this.otpResendCountdown.set(0);
     }
 
     formatCountdown(seconds: number): string {
