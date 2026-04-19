@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, signal, Input, Output, EventEmitter } from '@angular/core';
 
 export interface MonthYear {
   month: number; // 0-indexed (0 = Jan)
@@ -13,8 +13,8 @@ export interface MonthYear {
       type="button"
       class="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center"
       (click)="open()">
-      <span class="font-monospace" [class.text-muted]="!value()">
-        {{ displayValue() }}
+      <span class="font-monospace" [class.text-muted]="!value">
+        {{ displayValue }}
       </span>
       <small class="text-muted">&#9662;</small>
     </button>
@@ -25,7 +25,7 @@ export interface MonthYear {
 
         <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-body-tertiary border-bottom">
           <span class="text-uppercase text-muted fw-semibold" style="font-size: 10px; letter-spacing: .08em;">
-            {{ label() }}
+            {{ label }}
           </span>
           <span class="font-monospace fw-semibold">{{ preview() }}</span>
         </div>
@@ -133,9 +133,9 @@ export interface MonthYear {
   `],
 })
 export class MonthYearPickerComponent {
-  label = input<string>('Select date');
-  value = input<MonthYear | null>(null);
-  valueChange = output<MonthYear>();
+  @Input() label: string = 'Select date';
+  @Input() value: MonthYear | null = null;
+  @Output() valueChange = new EventEmitter<MonthYear>();
 
   readonly MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -154,10 +154,10 @@ export class MonthYearPickerComponent {
     Array.from({ length: 10 }, (_, i) => this.yearStart() + i)
   );
 
-  displayValue = computed(() => {
-    const v = this.value();
+  get displayValue(): string {
+    const v = this.value;
     return v ? `${this.MONTHS[v.month]} ${v.year}` : '— / —';
-  });
+  }
 
   preview = computed(() => {
     const m = this.tempMonth();
@@ -169,7 +169,7 @@ export class MonthYearPickerComponent {
   });
 
   open(): void {
-    const v = this.value();
+    const v = this.value;
     this.tempMonth.set(v?.month ?? this.today.month);
     this.tempYear.set(v?.year ?? this.today.year);
     this.isOpen.set(true);
