@@ -286,6 +286,126 @@ export class AuthService {
         return result;
     }
 
+    // ── Token exchange (for platform-owned roles) ──────────────────────────────
+
+    /**
+     * Exchange identity token for platform token.
+     *
+     * In the platform-owned roles architecture:
+     * 1. Auth service issues identity-only token (no roles)
+     * 2. Frontend exchanges identity token with platform API
+     * 3. Platform API returns platform token with roles from tenant DB
+     * 4. Platform token is used for subsequent API calls
+     *
+     * @param endpoint - Platform API endpoint for token exchange (default: '/api/auth/exchange')
+     * @returns { success, message?, role? } - Result of the exchange
+     *
+     * After successful exchange:
+     * - Platform token is stored as the main access token
+     * - Identity token is preserved for potential re-exchange
+     * - Role is extracted from platform token and attached to user
+     */
+    async exchangeToken(endpoint = '/api/auth/exchange'): Promise<{
+        success: boolean;
+        message?: string;
+        role?: string;
+    }> {
+        const identityToken = this.tokens.getAccessToken()
+        if (!identityToken) {
+            return { success: false, message: 'No identity token available' }
+        }
+
+        try {
+            const host = this.environment.apiServer.host
+            const response = await fetch(`${host}${endpoint}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${identityToken}`
+                },
+                body: JSON.stringify({})
+            })
+
+            const data = await response.json()
+
+            if (data.status === 'ok' && data.data?.access_token) {
+                // Store identity token separately before replacing access token
+                this.tokens.setIdentityToken(identityToken)
+
+                // Platform token becomes the main access token
+                this.tokens.setAccessToken(data.data.access_token)
+
+                // If platform token includes refresh token, update it
+                if (data.data.refresh_token) {
+                    this.tokens.setRefreshToken(data.data.refresh_token)
+                }
+
+                // Extract role from platform token and update user
+                const claims = this.tokens.decodeJwtPayload(data.data.access_token)
+                const role = claims?.role || data.data.role
+
+                const currentUser = this.getCurrentUser()
+                if (currentUser && role) {
+                    this.updateUser({ ...currentUser, role })
+                }
+
+                return { success: true, role }
+            }
+
+            return {
+                success: false,
+                message: data.message || 'Token exchange failed'
+            }
+        } catch (error) {
+            return {
+                success: false,
+                message: 'Network error during token exchange'
+            }
+        }
+    }
+
+    /**
+     * Re-exchange token using stored identity token.
+     * Useful when switching roles or tenant within the same session.
+     */
+    async reExchangeToken(endpoint = '/api/auth/exchange'): Promise<{
+        success: boolean;
+        message?: string;
+        role?: string;
+    }> {
+        const identityToken = this.tokens.getIdentityToken()
+        if (!identityToken) {
+            return { success: false, message: 'No identity token stored for re-exchange' }
+        }
+
+        // Temporarily restore identity token as access token
+        const currentAccessToken = this.tokens.getAccessToken()
+        this.tokens.setAccessToken(identityToken)
+
+        const result = await this.exchangeToken(endpoint)
+
+        // If exchange failed, restore previous access token
+        if (!result.success && currentAccessToken) {
+            this.tokens.setAccessToken(currentAccessToken)
+        }
+
+        return result
+    }
+
+    /**
+     * Check if token exchange is needed.
+     * Returns true if we have an identity token but the current access token
+     * doesn't contain a role claim (indicating it's an identity-only token).
+     */
+    needsTokenExchange(): boolean {
+        const accessToken = this.tokens.getAccessToken()
+        if (!accessToken) return false
+
+        const claims = this.tokens.decodeJwtPayload(accessToken)
+        // If no role in JWT, token exchange is needed
+        return !claims?.role
+    }
+
     // ── Multi-tenant operations ───────────────────────────────────────────────
 
     async getTenantMemberships(serverName?: string): Promise<{ memberships: TenantMembership[] }> {

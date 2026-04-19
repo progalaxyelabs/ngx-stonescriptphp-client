@@ -6,9 +6,11 @@ import { Injectable } from '@angular/core';
 export class TokenService {
     private accessToken = ''
     private refreshToken = ''
+    private identityToken = ''
 
     private lsAccessTokenKey = 'progalaxyapi_access_token'
     private lsRefreshTokenKey = 'progalaxyapi_refresh_token'
+    private lsIdentityTokenKey = 'progalaxyapi_identity_token'
 
     constructor() { }
 
@@ -58,8 +60,49 @@ export class TokenService {
     clear() {
         this.accessToken = ''
         this.refreshToken = ''
+        this.identityToken = ''
         localStorage.removeItem(this.lsAccessTokenKey)
         localStorage.removeItem(this.lsRefreshTokenKey)
+        localStorage.removeItem(this.lsIdentityTokenKey)
+    }
+
+    // ── Identity token (for token exchange flow) ──────────────────────────────
+
+    /**
+     * Store the identity token (from auth service) separately.
+     * Used in token exchange flow where identity token is exchanged for platform token.
+     */
+    setIdentityToken(identityToken: string) {
+        this.identityToken = identityToken
+        localStorage.setItem(this.lsIdentityTokenKey, identityToken)
+    }
+
+    /**
+     * Get the stored identity token.
+     * Returns empty string if no identity token is stored.
+     */
+    getIdentityToken(): string {
+        if (this.identityToken) {
+            return this.identityToken
+        }
+        const stored = localStorage.getItem(this.lsIdentityTokenKey)
+        return stored || ''
+    }
+
+    /**
+     * Check if an identity token is stored.
+     */
+    hasIdentityToken(): boolean {
+        return this.getIdentityToken() !== ''
+    }
+
+    /**
+     * Clear only the identity token (e.g., after successful exchange).
+     * Keeps access and refresh tokens intact.
+     */
+    clearIdentityToken() {
+        this.identityToken = ''
+        localStorage.removeItem(this.lsIdentityTokenKey)
     }
 
     /**

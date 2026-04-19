@@ -105,6 +105,40 @@ export class MyComponent {
 
 The `User` object is persisted in localStorage and restored on page refresh. It is populated from the auth service API response (not from the JWT token).
 
+### Token Exchange (Platform-Owned Roles)
+
+For architectures where roles are owned by the platform (not the auth service), use the token exchange flow:
+
+```typescript
+import { AuthService } from '@progalaxyelabs/ngx-stonescriptphp-client';
+
+@Component({ ... })
+export class AppComponent {
+  constructor(private authService: AuthService) {}
+
+  async ngOnInit() {
+    // After login, check if token exchange is needed
+    if (this.authService.needsTokenExchange()) {
+      const result = await this.authService.exchangeToken();
+      if (result.success) {
+        console.log('Token exchanged, role:', result.role);
+      }
+    }
+  }
+}
+```
+
+**How it works:**
+1. Auth service issues identity-only token (no roles)
+2. Call `exchangeToken()` to exchange with platform API (`/api/auth/exchange`)
+3. Platform returns token with roles from tenant DB
+4. Platform token is used for subsequent API calls
+
+**Methods:**
+- `exchangeToken(endpoint?)` - Exchange identity token for platform token
+- `reExchangeToken(endpoint?)` - Re-exchange using stored identity token
+- `needsTokenExchange()` - Check if current token lacks roles
+
 📖 **Documentation**: [CHANGELOG](docs/CHANGELOG.md) | [Auth Compatibility](docs/AUTH_COMPATIBILITY.md) | [Provider Config](AUTH-PROVIDER-CONFIG.md) | [Modal Auth Spec](MODAL-AUTH-SPEC.md) | [Multi-Auth Server](MULTI-AUTH-SERVER.md)
 
 ---
