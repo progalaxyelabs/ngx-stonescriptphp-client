@@ -21,6 +21,11 @@ export interface OtpSendResponse {
     masked_identifier: string;
     expires_in: number;
     resend_after: number;
+    /** true = identifier has no registered identity (new user), false = existing user */
+    is_new_identifier?: boolean;
+    /** Structured error code when success=false: 'identity_not_found' | 'identity_exists' */
+    error?: string;
+    message?: string;
 }
 
 export interface OtpVerifyResponse {
@@ -147,8 +152,11 @@ export interface AuthPlugin {
 
     // ── OTP authentication ──────────────────────────────────────────────────────
 
-    /** Send OTP to email or phone identifier */
-    sendOtp?(identifier: string): Promise<OtpSendResponse>;
+    /**
+     * Send OTP to email or phone identifier.
+     * @param mode 'login' → fail if not registered; 'signup' → fail if already registered; undefined → unified (backward-compat)
+     */
+    sendOtp?(identifier: string, mode?: 'login' | 'signup'): Promise<OtpSendResponse>;
 
     /** Verify OTP code and receive a verified_token */
     verifyOtp?(identifier: string, code: string): Promise<OtpVerifyResponse>;

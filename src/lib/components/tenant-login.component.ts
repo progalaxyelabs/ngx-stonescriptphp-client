@@ -788,6 +788,13 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
     @Input() prefillEmail?: string;
     @Input() allowTenantCreation: boolean = true;
     @Input() otpIdentifierTypes: ('email' | 'phone')[] = ['email', 'phone'];
+    /**
+     * OTP mode — controls which auth endpoint is called and what error is shown:
+     * - 'login'   → /api/auth/login/email/otp/send  — fails if email not registered
+     * - 'signup'  → /api/auth/register/email/otp/send — fails if email already registered
+     * - undefined → /api/auth/otp/send — unified mode, backward-compat (default)
+     */
+    @Input() mode?: 'login' | 'signup';
 
     // Tenant Selector Labels
     @Input() tenantSelectorTitle: string = 'Select Organization';
@@ -1201,8 +1208,22 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         this.otpIdentifierError.set('');
 
         try {
-            const result = await this.auth.sendOtp(this._otpNormalizedIdentifier());
+            const result = await this.auth.sendOtp(this._otpNormalizedIdentifier(), this.mode);
             if (!result.success) {
+                if (result.error === 'identity_not_found') {
+                    // Login mode: email not registered
+                    this.otpIdentifierError.set(result.message || 'Account not found. Please sign up first.');
+                    this.otpIdentifierErrorColor.set('red');
+                    this.committedFlow.set('none');
+                    return;
+                }
+                if (result.error === 'identity_exists') {
+                    // Signup mode: email already registered
+                    this.otpIdentifierError.set(result.message || 'Email already registered. Please sign in instead.');
+                    this.otpIdentifierErrorColor.set('orange');
+                    this.committedFlow.set('none');
+                    return;
+                }
                 this.error.set('Failed to send OTP. Please try again.');
                 return;
             }

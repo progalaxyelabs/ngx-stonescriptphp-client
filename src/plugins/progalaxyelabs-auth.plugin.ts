@@ -180,9 +180,19 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
 
     // -- OTP authentication --------------------------------------------------
 
-    async sendOtp(identifier: string): Promise<OtpSendResponse> {
+    async sendOtp(identifier: string, mode?: 'login' | 'signup'): Promise<OtpSendResponse> {
+        // Route to the correct endpoint based on mode:
+        //   login  → /api/auth/login/email/otp/send  (blocks if not registered)
+        //   signup → /api/auth/register/email/otp/send (blocks if already registered)
+        //   none   → /api/auth/otp/send (unified, backward-compat)
+        const endpoint = mode === 'login'
+            ? `${this.host}/api/auth/login/email/otp/send`
+            : mode === 'signup'
+                ? `${this.host}/api/auth/register/email/otp/send`
+                : `${this.host}/api/auth/otp/send`;
+
         try {
-            const response = await fetch(`${this.host}/api/auth/otp/send`, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ identifier, platform_code: this.config.platformCode })
@@ -195,7 +205,8 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                     masked_identifier: '',
                     expires_in: 0,
                     resend_after: 0,
-                    ...data
+                    error: data.error,
+                    message: data.message,
                 };
             }
             return {
@@ -203,7 +214,8 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                 identifier_type: data.identifier_type,
                 masked_identifier: data.masked_identifier,
                 expires_in: data.expires_in,
-                resend_after: data.resend_after
+                resend_after: data.resend_after,
+                is_new_identifier: data.is_new_identifier,
             };
         } catch {
             return {
