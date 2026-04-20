@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { Router } from '@angular/router';
 import { TokenService } from './token.service';
 import { SigninStatusService } from './signin-status.service';
 import { MyEnvironmentModel } from './my-environment.model';
@@ -41,7 +42,8 @@ export class AuthService {
         @Inject(AUTH_PLUGIN) private plugin: AuthPlugin,
         private tokens: TokenService,
         private signinStatus: SigninStatusService,
-        private environment: MyEnvironmentModel
+        private environment: MyEnvironmentModel,
+        private router: Router
     ) {
         this.restoreUser();
     }
@@ -162,6 +164,19 @@ export class AuthService {
         this.tokens.clear();
         this.signinStatus.setSigninStatus(false);
         this.updateUser(null);
+    }
+
+    /**
+     * Clear the local session immediately without hitting the server logout endpoint.
+     * Called when the API returns 401 after a token refresh — meaning the session is
+     * no longer valid server-side (e.g. tenant deleted, token revoked).
+     * Clears tokens, resets user state, and redirects to /login.
+     */
+    clearSession(loginRoute: string = '/login'): void {
+        this.tokens.clear();
+        this.updateUser(null);
+        this.signinStatus.setSigninStatus(false);
+        this.router.navigate([loginRoute], { replaceUrl: true });
     }
 
     async checkSession(serverName?: string): Promise<boolean> {

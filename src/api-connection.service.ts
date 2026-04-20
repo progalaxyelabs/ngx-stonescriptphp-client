@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { TokenService } from './token.service';
-import { SigninStatusService } from './signin-status.service';
 import { ApiResponse } from './api-response.model';
 import { MyEnvironmentModel } from './my-environment.model';
 import { AuthService } from './auth.service';
@@ -14,7 +13,6 @@ export class ApiConnectionService {
 
     constructor(
         private tokens: TokenService,
-        private signinStatus: SigninStatusService,
         private environment: MyEnvironmentModel,
         private authService: AuthService
     ) {
@@ -42,7 +40,7 @@ export class ApiConnectionService {
             }
 
             if (response.status === 401) {
-                this.signinStatus.signedOut()
+                this.authService.clearSession()
             }
 
             return await this.handleError<DataType>(response, options.method || 'GET', url)
