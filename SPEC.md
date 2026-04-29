@@ -634,6 +634,360 @@ The `<lib-tenant-login>` component accepts these inputs for customization:
 
 ---
 
+---
+
+## 10. verify-OTP Contract
+
+### 10.1 Input
+
+The `verifyOtp()` method accepts:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `identifier` | `string` | Yes | Email or phone that received the OTP |
+| `code` | `string` | Yes | 6-digit OTP code entered by user |
+
+### 10.2 Expected Server Response
+
+The progalaxyelabs-auth server returns (see progalaxyelabs-auth SPEC.md §4):
+
+**Success (HTTP 200):**
+```json
+{
+    "success": true,
+    "verified_token": "eyJ..."
+}
+```
+
+**Failure (HTTP 400/404):**
+```json
+{
+    "success": false,
+    "error": "otp_invalid",
+    "message": "Invalid verification code",
+    "remaining_attempts": 2
+}
+```
+
+Error codes: `otp_invalid`, `otp_expired`, `otp_rate_limited`, `otp_not_found`.
+
+### 10.3 Library Interpretation
+
+The library returns `OtpVerifyResponse`:
+
+```typescript
+interface OtpVerifyResponse {
+    success: boolean;
+    verified_token: string;       // Empty on failure
+    error?: string;               // Error code on failure
+    message?: string;             // Human-readable message
+    remaining_attempts?: number;  // Attempts left before lockout
+    can_resend?: boolean;
+    retry_after?: number;
+}
+```
+
+**Success detection:** `success === true && verified_token !== ''`
+
+### 10.4 What Happens After Verification
+
+On successful OTP verification, the flow continues automatically:
+
+1. Library stores `verified_token` internally
+2. Library calls `identityLogin(verified_token)` to check if identity exists
+3. **If identity exists:** `handlePostAuthFlow()` is called → tokens stored → navigation trigger
+4. **If identity not found (HTTP 404):** UI transitions to registration form
+5. **On error:** error banner shown, no navigation
+
+**Critical:** The library handles navigation trigger internally via the `needsOnboarding` or `authComplete` event. The consuming app MUST listen to these events and perform the actual `router.navigate()`.
+
+### 10.5 Historical Bug (Fixed in v1.26.0)
+
+Prior to v1.26.0, a race condition caused duplicate `POST /api/auth/otp/verify` requests:
+- First request succeeded, consuming the OTP
+- Second request returned 400 (already used)
+- UI displayed the second request's error despite success
+
+**Fix:** v1.26.0 added a `loading()` signal guard and synchronous state updates, preventing double-submit. See task #2281.
+
+---
+
+## 11. Response Interpretation Rules
+
+### 11.1 StoneScriptPHP Response Envelope
+
+The library expects responses from StoneScriptPHP backends to follow this envelope (see stonescriptphp SPEC.md §3):
+
+```typescript
+interface Envelope<T> {
+    status: 'ok' | 'not ok' | 'error';
+    message: string;
+    data: T | null;
+}
+```
+
+### 11.2 Success Detection
+
+A response is considered **successful** when ALL of:
+- HTTP status is 2xx
+- `status === 'ok'`
+
+The library MUST NOT surface a success as an error. If HTTP is 200 and `status` is `'ok'`, the operation succeeded.
+
+### 11.3 Error Detection
+
+A response is an **error** when ANY of:
+- HTTP status is 4xx or 5xx
+- `status === 'error'` or `status === 'not ok'`
+
+### 11.4 ApiResponse Wrapping
+
+All HTTP responses are wrapped in `ApiResponse<T>`:
+
+```typescript
+const response = await api.get<Widget[]>('/widgets');
+// response.success is true ONLY if status === 'ok'
+// response.message contains error message on failure
+```
+
+### 11.5 Auth Responses (Different Format)
+
+The progalaxyelabs-auth server uses a DIFFERENT format (not the StoneScriptPHP envelope):
+
+```typescript
+// Auth success (flat format)
+{
+    access_token: string;
+    refresh_token: string;
+    identity: { email, display_name, ... };
+    membership?: { tenant_id, role, ... };
+}
+
+// Auth error
+{
+    error?: string;   // Error code
+    message?: string; // Human-readable
+}
+```
+
+The `ProgalaxyElabsAuth` plugin handles this format directly. The `StoneScriptPHPAuth` plugin uses `AuthResponseMap` to handle StoneScriptPHP envelope format.
+
+---
+
+## 12. Error Mapping
+
+### 12.1 HTTP Status Mapping
+
+| HTTP Status | User-Facing Treatment | Details |
+|-------------|----------------------|---------|
+| 2xx | Success | Display data or success message |
+| 400 | Verbatim | Show `message` from response body |
+| 401 | Redirect | Auto-refresh attempt; on failure, redirect to login |
+| 403 | Verbatim | Show `message` (permission denied) |
+| 404 | Context-aware | "Not found" or "No data" depending on endpoint |
+| 422 | Verbatim | Show validation error messages |
+| 429 | Rate limited | "Too many requests. Please wait." |
+| 5xx | Generic | "Something went wrong. Please try again." |
+
+### 12.2 OTP Error Mapping
+
+| Error Code | User Message | UI Treatment |
+|------------|--------------|--------------|
+| `otp_invalid` | "Invalid code. N attempt(s) remaining." | Red banner, stay on code entry |
+| `otp_expired` | "Your code has expired. Please request a new one." | Orange banner, return to identifier |
+| `otp_rate_limited` | "Too many attempts. Please try again later." | Red banner, return to identifier |
+| `otp_not_found` | "No code found. Please request a new one." | Orange banner, return to identifier |
+
+### 12.3 Security: Never Expose Internals
+
+The library MUST NEVER expose to the browser:
+- Stack traces
+- SQL fragments or database errors
+- Framework internal exceptions
+- File paths or line numbers
+- Sensitive configuration values
+
+5xx errors MUST show a generic message even if the response body contains technical details.
+
+---
+
+## 13. Publish + Consume Policy
+
+### 13.1 npm-publish-first Rule
+
+**NEVER use `file:` dependencies in production.**
+
+Before a consuming app can use library changes:
+1. Make changes in ngx-stonescriptphp-client
+2. Bump version (`npm version patch|minor|major`)
+3. Build (`npm run build`)
+4. Publish (`cd dist && npm publish`)
+5. Update consumer (`npm update @progalaxyelabs/ngx-stonescriptphp-client`)
+
+### 13.2 SemVer Discipline
+
+| Change Type | Version Bump | Examples |
+|-------------|--------------|----------|
+| Bug fix, no API change | PATCH (1.2.3 → 1.2.4) | Fix race condition, improve error message |
+| New feature, backward-compatible | MINOR (1.2.3 → 1.3.0) | Add new method, new optional config |
+| Breaking change | MAJOR (1.2.3 → 2.0.0) | Remove method, change signature, rename export |
+
+### 13.3 Breaking Changes
+
+A breaking change is ANY of:
+- Removing a public method, property, or class
+- Changing method signatures (required params, return type)
+- Renaming exports
+- Changing default behavior
+- Removing or renaming configuration options
+
+Breaking changes MUST:
+1. Bump major version
+2. Document in CHANGELOG.md
+3. Provide migration guide
+
+### 13.4 Consumer Upgrade Workflow
+
+```bash
+# Check for updates
+npm outdated @progalaxyelabs/ngx-stonescriptphp-client
+
+# Update (respects semver in package.json)
+npm update @progalaxyelabs/ngx-stonescriptphp-client
+
+# Or update to specific version
+npm install @progalaxyelabs/ngx-stonescriptphp-client@1.27.0
+```
+
+---
+
+## 14. Signals + Zoneless Compatibility
+
+### 14.1 Requirement
+
+The library MUST work in both:
+- **Legacy apps:** Angular with zone.js and traditional change detection
+- **Modern apps:** Angular with signals and zoneless change detection (`provideExperimentalZonelessChangeDetection()`)
+
+### 14.2 Implementation (v1.26.0+)
+
+As of v1.26.0, the library's UI components use Angular signals:
+
+```typescript
+// Internal state uses signals
+loading = signal(false);
+error = signal('');
+otpStep = signal<'identifier' | 'code' | 'register'>('identifier');
+
+// Template binds to signals
+@if (loading()) { <spinner /> }
+@if (error()) { <error-banner [message]="error()" /> }
+```
+
+### 14.3 Why Signals Matter
+
+Signals provide:
+- Synchronous state updates (no NgZone race conditions)
+- Fine-grained reactivity (only affected DOM updates)
+- Zoneless compatibility (no zone.js dependency for change detection)
+
+The v1.26.0 signals rewrite fixed the duplicate-POST bug (#2281) because signal updates are synchronous — the `loading()` guard works immediately.
+
+### 14.4 Service Compatibility
+
+Services (`AuthService`, `ApiConnectionService`, `TokenService`) are not signal-based — they use Promises and BehaviorSubjects. This is intentional:
+- BehaviorSubject works with both zone and zoneless apps
+- Promise-based APIs are clearer for async operations
+- No breaking change for existing consumers
+
+---
+
+## 15. HTTP Transport
+
+### 15.1 No Angular HttpClient
+
+The library uses **native `fetch()`** for all HTTP requests, not Angular's `HttpClient`.
+
+**Rationale:**
+- No HttpClientModule dependency
+- Simpler promise-based API
+- Works identically in zone and zoneless apps
+- Smaller bundle (no Angular HTTP interceptor chain)
+
+### 15.2 No HTTP Interceptors
+
+Because the library uses `fetch()`, Angular HTTP interceptors do NOT apply. The library handles:
+
+| Concern | How Handled |
+|---------|-------------|
+| Bearer token injection | `ApiConnectionService` adds `Authorization` header |
+| 401 refresh-and-retry | `ApiConnectionService` internal logic |
+| CSRF token | `ApiConnectionService` reads cookie, adds header |
+| Correlation headers | Not implemented (see gap) |
+
+### 15.3 Request Pipeline Order
+
+1. Build URL from `environment.apiServer.host` + endpoint
+2. If authenticated, add `Authorization: Bearer {accessToken}`
+3. If cookie mode + CSRF enabled, add `X-CSRF-Token` header
+4. Execute `fetch()` with `mode: 'cors'`, `redirect: 'error'`
+5. If 401 received:
+   a. Attempt token refresh via `auth.refresh()`
+   b. If refresh succeeds, retry original request once
+   c. If refresh fails, emit `signedOut()` event
+6. Parse JSON and wrap in `ApiResponse<T>`
+
+### 15.4 Gap: Correlation Headers
+
+The library does NOT currently add request-id or tenant-id correlation headers. This would aid debugging in distributed traces. Implementation pending.
+
+---
+
+## 16. Route-URL Uniqueness
+
+### 16.1 Rule
+
+Every distinct UI state MUST have a unique URL. This applies to:
+- Auth steps (identifier entry, OTP code, registration)
+- Wizard steps (onboarding page 1, 2, 3)
+- Tab states (settings → profile vs settings → billing)
+- Filter states (list → all vs list → pending)
+
+### 16.2 Exception
+
+The ONLY exception: inline `@if` error blocks that show/hide without changing the logical "screen":
+
+```html
+<!-- OK: error banner is transient, same screen -->
+@if (error()) {
+    <div class="error">{{ error() }}</div>
+}
+```
+
+### 16.3 Auth Component Routes
+
+The `<lib-tenant-login>` component maintains internal state (`otpStep` signal) but does NOT control routes. The consuming app MUST:
+
+1. Host the component at a route (e.g., `/login`)
+2. Listen to navigation events (`authComplete`, `needsOnboarding`)
+3. Navigate to appropriate routes on those events
+
+Example:
+```typescript
+<lib-tenant-login
+    (authComplete)="router.navigate(['/dashboard'])"
+    (needsOnboarding)="router.navigate(['/onboarding'])"
+/>
+```
+
+### 16.4 Gap: OTP Steps Not URL-Addressable
+
+Currently, the OTP flow steps (`identifier` → `code` → `register`) are internal signals, not URL segments. A user refreshing during code entry loses their place. This is a known limitation.
+
+Future improvement: URL fragments or query params for step state (e.g., `/login?step=code`).
+
+---
+
 ## Appendix A: Built-in Auth Plugins Comparison
 
 | Feature | `ProgalaxyElabsAuth` | `StoneScriptPHPAuth` |
@@ -658,10 +1012,18 @@ The `<lib-tenant-login>` component accepts these inputs for customization:
 
 ## Appendix C: Implementation Gaps Summary
 
-| Section | Gap | Priority |
-|---------|-----|----------|
-| 3.2 | `TokenService` mutation methods are public; should be internal-only | Medium |
-| 5.4 | `FilesService` duplicates refresh-and-retry logic | Low |
-| 6.3 | No ESLint plugin/config shipped for raw fetch prevention | Medium |
-| 7 | No route guards shipped; all implemented per-platform | High |
-| 7.2 | `provideNgxStoneScriptPhpClient` does not accept route config for guards | High (blocked on guard implementation) |
+| Section | Gap | File:Line | Priority |
+|---------|-----|-----------|----------|
+| 3.2 | `TokenService` mutation methods are public; should be internal-only | `src/token.service.ts:*` | Medium |
+| 5.4 | `FilesService` duplicates refresh-and-retry logic | `src/files.service.ts:*` | Low |
+| 6.3 | No ESLint plugin/config shipped for raw fetch prevention | — | Medium |
+| 7 | No route guards shipped; all implemented per-platform | — | High |
+| 7.2 | `provideNgxStoneScriptPhpClient` does not accept route config for guards | `src/provide.ts` | High |
+| 15.4 | No request-id or tenant-id correlation headers | `src/api-connection.service.ts` | Low |
+| 16.4 | OTP flow steps not URL-addressable; refresh loses state | `src/lib/components/tenant-login.component.ts:*` | Medium |
+
+### Historical Gap (FIXED)
+
+| Version | Gap | Resolution |
+|---------|-----|------------|
+| Pre-1.26.0 | Duplicate OTP verify POST due to zone.js race condition | Fixed in v1.26.0 by signals rewrite (#2281, #2234) |
