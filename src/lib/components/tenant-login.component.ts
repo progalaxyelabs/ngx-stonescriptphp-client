@@ -1368,9 +1368,24 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         this.onOtpSend();
     }
 
-    /** Go back to identifier entry */
-    onOtpBack(event: Event) {
+    /** Go back to identifier entry — cancels pending OTP and clears form */
+    async onOtpBack(event: Event) {
         event.preventDefault();
+
+        // Cancel pending OTP on server (escape hatch)
+        const identifier = this._otpNormalizedIdentifier();
+        if (identifier && this.auth.cancelPendingOtp) {
+            try {
+                await this.auth.cancelPendingOtp(identifier);
+            } catch {
+                // Ignore errors — best effort cleanup
+            }
+        }
+
+        // Clear form completely (prevents re-submitting same typo)
+        this._otpIdentifier.set('');
+        this._otpNormalizedIdentifier.set('');
+        this.otpMaskedIdentifier.set('');
         this.otpStep.set('identifier');
         this.otpDigits.set(['', '', '', '', '', '']);
         this._otpVerifiedToken.set('');

@@ -167,6 +167,9 @@ export interface AuthPlugin {
     /** Register a new identity with a verified_token (for new users) */
     identityRegister?(verifiedToken: string, displayName: string): Promise<AuthResult>;
 
+    /** Cancel a pending OTP (escape hatch when user wants to change email) */
+    cancelPendingOtp?(identifier: string): Promise<{ success: boolean }>;
+
     // ── Multi-server (implemented by StoneScriptPHPAuth) ──────────────────────
 
     switchServer?(serverName: string): void;

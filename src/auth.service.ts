@@ -301,6 +301,17 @@ export class AuthService {
         return result;
     }
 
+    /**
+     * Cancel a pending OTP (escape hatch when user wants to change email).
+     * Called when user clicks "Use a different email" in the OTP code entry step.
+     */
+    async cancelPendingOtp(identifier: string): Promise<{ success: boolean }> {
+        if (!this.plugin.cancelPendingOtp) {
+            return { success: true }; // No-op if plugin doesn't support it
+        }
+        return this.plugin.cancelPendingOtp(identifier);
+    }
+
     // ── Token exchange (for platform-owned roles) ──────────────────────────────
 
     /**

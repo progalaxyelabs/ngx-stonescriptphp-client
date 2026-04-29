@@ -248,6 +248,18 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
         }
     }
 
+    async cancelPendingOtp(identifier: string): Promise<{ success: boolean }> {
+        try {
+            const response = await fetch(
+                `${this.host}/api/auth/otp/pending?identifier=${encodeURIComponent(identifier)}`,
+                { method: 'DELETE' }
+            );
+            return { success: response.ok };
+        } catch {
+            return { success: false };
+        }
+    }
+
     async identityLogin(verifiedToken: string): Promise<AuthResult> {
         try {
             const response = await fetch(`${this.host}/api/identity/login`, {
