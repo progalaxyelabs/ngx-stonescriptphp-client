@@ -1426,11 +1426,7 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
         if (value && index < 5) {
             this.focusOtpInput(index + 1);
         }
-
-        // Auto-verify when all 6 digits entered
-        if (this.otpCode.length === 6) {
-            this.onOtpVerify();
-        }
+        // Auto-verify removed — caused double-submit race with button click (see task #2441)
     }
 
     onOtpDigitKeydown(event: KeyboardEvent, index: number) {
@@ -1455,11 +1451,8 @@ export class TenantLoginComponent implements OnInit, OnDestroy {
                 inputs[i].nativeElement.value = newDigits[i];
             }
         }
-        if (pasted.length >= 6) {
-            this.onOtpVerify();
-        } else {
-            this.focusOtpInput(Math.min(pasted.length, 5));
-        }
+        // Focus last filled input (auto-verify removed — see task #2441)
+        this.focusOtpInput(Math.min(pasted.length, 5));
     }
 
     get otpCode(): string {
