@@ -275,6 +275,10 @@ export class ProgalaxyElabsAuth implements AuthPlugin {
                 return { success: false, message: 'identity_not_found' };
             }
             const data = await response.json();
+            // Handle explicit "identity doesn't exist" response (200 with exists:false)
+            if (data.exists === false) {
+                return { success: false, message: 'identity_not_found' };
+            }
             if (!response.ok) {
                 return { success: false, message: data.error || data.message || 'Login failed' };
             }
