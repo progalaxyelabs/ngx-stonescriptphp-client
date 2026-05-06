@@ -1,7 +1,7 @@
 import { EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { MyEnvironmentModel } from './my-environment.model';
-import { AUTH_PLUGIN, AuthPlugin } from './auth.plugin';
-import { StoneScriptPHPAuth } from './plugins/stonescriptphp-auth.plugin';
+import { MyEnvironmentModel, AuthPlugin } from '@progalaxyelabs/stonescriptphp-client-core';
+import { StoneScriptPHPAuth } from '@progalaxyelabs/stonescriptphp-auth-client';
+import { AUTH_PLUGIN } from './auth.plugin';
 
 /**
  * Configure the ngx-stonescriptphp-client library.
@@ -22,19 +22,10 @@ import { StoneScriptPHPAuth } from './plugins/stonescriptphp-auth.plugin';
  *
  * @example External auth plugin
  * ```typescript
- * import { ProgalaxyElabsAuth } from './progalaxyelabs-auth.auth-plugin';
+ * import { ProgalaxyElabsAuth } from '@progalaxyelabs/stonescriptphp-auth-client';
  *
  * providers: [
- *   provideNgxStoneScriptPhpClient(environment, new ProgalaxyElabsAuth({ host: '...' }))
- * ]
- * ```
- *
- * @example Firebase
- * ```typescript
- * import { FirebaseAuthPlugin } from './firebase-auth.auth-plugin';
- *
- * providers: [
- *   provideNgxStoneScriptPhpClient(environment, new FirebaseAuthPlugin(firebaseConfig))
+ *   provideNgxStoneScriptPhpClient(environment, new ProgalaxyElabsAuth({ host: '...', platformCode: '...' }))
  * ]
  * ```
  */
@@ -43,14 +34,11 @@ export function provideNgxStoneScriptPhpClient(
     plugin?: AuthPlugin
 ): EnvironmentProviders {
     const resolvedPlugin = plugin ?? new StoneScriptPHPAuth({
-        // Resolve auth host: auth.host → accountsServer.host (compat) → accountsUrl (compat) → apiServer.host
-        host: environment.auth?.host
-            || environment.accountsServer?.host
-            || environment.accountsUrl
-            || environment.apiServer.host,
+        // Resolve auth host: auth.host → apiServer.host
+        host: environment.auth?.host || environment.apiServer.host,
         platformCode: environment.platformCode,
         authServers: environment.authServers,
-        responseMap: environment.auth?.responseMap ?? environment.authResponseMap,
+        responseMap: environment.auth?.responseMap,
         auth: environment.auth
     });
 

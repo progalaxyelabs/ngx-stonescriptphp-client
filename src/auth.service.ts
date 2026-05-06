@@ -1,33 +1,36 @@
-import { Injectable, Inject } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { Router } from '@angular/router';
+import { Injectable, Inject, signal, computed } from '@angular/core';
 import { TokenService } from './token.service';
-import { SigninStatusService } from './signin-status.service';
-import { MyEnvironmentModel } from './my-environment.model';
-import { AUTH_PLUGIN, AuthPlugin, AuthResult, OtpSendResponse, OtpVerifyResponse, TenantMembership, User } from './auth.plugin';
+import {
+    MyEnvironmentModel,
+    AuthPlugin,
+    AuthResult,
+    User,
+    TenantMembership,
+    OtpSendResponse,
+    OtpVerifyResponse
+} from '@progalaxyelabs/stonescriptphp-client-core';
+import { AUTH_PLUGIN } from './auth.plugin';
 
 // Re-export types for backward compatibility
-export type { AuthResult, TenantMembership, User };
-export type { AuthPlugin };
+export type { AuthResult, TenantMembership, User, AuthPlugin };
 
 export type BuiltInProvider = 'google' | 'linkedin' | 'apple' | 'microsoft' | 'github' | 'zoho' | 'emailPassword';
 
 /**
  * Authentication provider identifier.
  * Includes all built-in providers plus any custom string identifier.
- * The (string & {}) trick preserves autocomplete for built-in values.
  */
 export type AuthProvider = BuiltInProvider | (string & {});
 
 /**
  * AuthService — manages auth state and delegates all auth operations to the AuthPlugin.
  *
- * This service holds user state (via BehaviorSubject) and tokens (via TokenService).
+ * This service holds user state (via signal) and tokens (via TokenService).
  * It does not make any HTTP calls directly — all auth logic lives in the plugin.
  *
  * Provide a plugin via provideNgxStoneScriptPhpClient():
- * - Default: StoneScriptPHPAuth (built-in, matches StoneScriptPHP backend)
- * - External: any class implementing AuthPlugin (Firebase, progalaxyelabs-auth, Okta, etc.)
+ * - Default: StoneScriptPHPAuth (from @progalaxyelabs/stonescriptphp-auth-client)
+ * - External: any class implementing AuthPlugin
  */
 @Injectable({
     providedIn: 'root'
@@ -35,15 +38,16 @@ export type AuthProvider = BuiltInProvider | (string & {});
 export class AuthService {
     private readonly USER_STORAGE_KEY = 'progalaxyapi_user';
 
-    private userSubject = new BehaviorSubject<User | null>(null);
-    public user$: Observable<User | null> = this.userSubject.asObservable();
+    /** Signal-based user state */
+    readonly user = signal<User | null>(null);
+
+    /** Computed: true if user is authenticated */
+    readonly isLoggedIn = computed(() => this.user() !== null);
 
     constructor(
         @Inject(AUTH_PLUGIN) private plugin: AuthPlugin,
         private tokens: TokenService,
-        private signinStatus: SigninStatusService,
-        private environment: MyEnvironmentModel,
-        private router: Router
+        @Inject(MyEnvironmentModel) private environment: MyEnvironmentModel
     ) {
         this.restoreUser();
     }
@@ -72,7 +76,7 @@ export class AuthService {
     }
 
     private updateUser(user: User | null): void {
-        this.userSubject.next(user);
+        this.user.set(user);
         this.saveUser(user);
     }
 
@@ -86,12 +90,10 @@ export class AuthService {
                 : this.enrichUserWithJwtRole(result.user, result.accessToken);
             this.updateUser(user);
         }
-        this.signinStatus.setSigninStatus(true);
     }
 
     /**
      * Decode the access token and attach the `role` claim to the user object.
-     * Falls back to role from the membership field in the AuthResult if no JWT role found.
      */
     private enrichUserWithJwtRole(user: User, accessToken?: string): User {
         if (accessToken) {
@@ -162,21 +164,18 @@ export class AuthService {
         const refreshToken = this.tokens.getRefreshToken() || undefined;
         await this.plugin.logout(refreshToken);
         this.tokens.clear();
-        this.signinStatus.setSigninStatus(false);
         this.updateUser(null);
     }
 
     /**
      * Clear the local session immediately without hitting the server logout endpoint.
-     * Called when the API returns 401 after a token refresh — meaning the session is
-     * no longer valid server-side (e.g. tenant deleted, token revoked).
-     * Clears tokens, resets user state, and redirects to /login.
+     * Called when the API returns 401 after a token refresh.
+     *
+     * @param loginRoute - Optional route to navigate to (not used in v2 - consumer handles navigation)
      */
-    clearSession(loginRoute: string = '/login'): void {
+    clearSession(loginRoute?: string): void {
         this.tokens.clear();
         this.updateUser(null);
-        this.signinStatus.setSigninStatus(false);
-        this.router.navigate([loginRoute], { replaceUrl: true });
     }
 
     async checkSession(serverName?: string): Promise<boolean> {
@@ -187,7 +186,6 @@ export class AuthService {
                 const enriched = this.enrichUserWithJwtRole(storedUser);
                 if (enriched.role) this.updateUser(enriched);
             }
-            this.signinStatus.setSigninStatus(true);
             return true;
         }
         const result = await this.plugin.checkSession();
@@ -196,18 +194,16 @@ export class AuthService {
             if (result.user) {
                 this.updateUser(this.enrichUserWithJwtRole(result.user, result.accessToken));
             }
-            this.signinStatus.setSigninStatus(true);
             return true;
         }
         this.tokens.clear();
         this.updateUser(null);
-        this.signinStatus.setSigninStatus(false);
         return false;
     }
 
     /**
      * Refresh the access token. Called by ApiConnectionService on 401.
-     * @returns true if token was refreshed, false if refresh failed (user is signed out)
+     * @returns true if token was refreshed, false if refresh failed
      */
     async refresh(): Promise<boolean> {
         const newToken = await this.plugin.refresh(
@@ -220,7 +216,6 @@ export class AuthService {
         }
         this.tokens.clear();
         this.updateUser(null);
-        this.signinStatus.signedOut();
         return false;
     }
 
@@ -232,7 +227,6 @@ export class AuthService {
 
     /**
      * Update the authenticated user's display name.
-     * Calls PUT /api/account/profile with { display_name } and updates local user state on success.
      */
     async updateProfile(displayName: string): Promise<{ success: boolean; message?: string }> {
         const accessToken = this.tokens.getAccessToken();
@@ -264,7 +258,7 @@ export class AuthService {
     }
 
     getCurrentUser(): User | null {
-        return this.userSubject.value;
+        return this.user();
     }
 
     // ── OTP authentication ─────────────────────────────────────────────────────
@@ -301,48 +295,27 @@ export class AuthService {
         return result;
     }
 
-    /**
-     * Cancel a pending OTP (escape hatch when user wants to change email).
-     * Called when user clicks "Use a different email" in the OTP code entry step.
-     */
     async cancelPendingOtp(identifier: string): Promise<{ success: boolean }> {
         if (!this.plugin.cancelPendingOtp) {
-            return { success: true }; // No-op if plugin doesn't support it
+            return { success: true };
         }
         return this.plugin.cancelPendingOtp(identifier);
     }
 
     // ── Token exchange (for platform-owned roles) ──────────────────────────────
 
-    /**
-     * Exchange identity token for platform token.
-     *
-     * In the platform-owned roles architecture:
-     * 1. Auth service issues identity-only token (no roles)
-     * 2. Frontend exchanges identity token with platform API
-     * 3. Platform API returns platform token with roles from tenant DB
-     * 4. Platform token is used for subsequent API calls
-     *
-     * @param endpoint - Platform API endpoint for token exchange (default: '/api/auth/exchange')
-     * @returns { success, message?, role? } - Result of the exchange
-     *
-     * After successful exchange:
-     * - Platform token is stored as the main access token
-     * - Identity token is preserved for potential re-exchange
-     * - Role is extracted from platform token and attached to user
-     */
     async exchangeToken(endpoint = '/api/auth/exchange'): Promise<{
         success: boolean;
         message?: string;
         role?: string;
     }> {
-        const identityToken = this.tokens.getAccessToken()
+        const identityToken = this.tokens.getAccessToken();
         if (!identityToken) {
-            return { success: false, message: 'No identity token available' }
+            return { success: false, message: 'No identity token available' };
         }
 
         try {
-            const host = this.environment.apiServer.host
+            const host = this.environment.apiServer.host;
             const response = await fetch(`${host}${endpoint}`, {
                 method: 'POST',
                 headers: {
@@ -350,86 +323,69 @@ export class AuthService {
                     'Authorization': `Bearer ${identityToken}`
                 },
                 body: JSON.stringify({})
-            })
+            });
 
-            const data = await response.json()
+            const data = await response.json();
 
             if (data.status === 'ok' && data.data?.access_token) {
-                // Store identity token separately before replacing access token
-                this.tokens.setIdentityToken(identityToken)
+                this.tokens.setIdentityToken(identityToken);
+                this.tokens.setAccessToken(data.data.access_token);
 
-                // Platform token becomes the main access token
-                this.tokens.setAccessToken(data.data.access_token)
-
-                // If platform token includes refresh token, update it
                 if (data.data.refresh_token) {
-                    this.tokens.setRefreshToken(data.data.refresh_token)
+                    this.tokens.setRefreshToken(data.data.refresh_token);
                 }
 
-                // Extract role from platform token and update user
-                const claims = this.tokens.decodeJwtPayload(data.data.access_token)
-                const role = claims?.role || data.data.role
+                const claims = this.tokens.decodeJwtPayload(data.data.access_token);
+                const role = claims?.role || data.data.role;
 
-                const currentUser = this.getCurrentUser()
+                const currentUser = this.getCurrentUser();
                 if (currentUser && role) {
-                    this.updateUser({ ...currentUser, role })
+                    this.updateUser({ ...currentUser, role });
                 }
 
-                return { success: true, role }
+                return { success: true, role };
             }
 
             return {
                 success: false,
                 message: data.message || 'Token exchange failed'
-            }
+            };
         } catch (error) {
             return {
                 success: false,
                 message: 'Network error during token exchange'
-            }
+            };
         }
     }
 
-    /**
-     * Re-exchange token using stored identity token.
-     * Useful when switching roles or tenant within the same session.
-     */
     async reExchangeToken(endpoint = '/api/auth/exchange'): Promise<{
         success: boolean;
         message?: string;
         role?: string;
     }> {
-        const identityToken = this.tokens.getIdentityToken()
+        const identityToken = this.tokens.getIdentityToken();
         if (!identityToken) {
-            return { success: false, message: 'No identity token stored for re-exchange' }
+            return { success: false, message: 'No identity token stored for re-exchange' };
         }
 
-        // Temporarily restore identity token as access token
-        const currentAccessToken = this.tokens.getAccessToken()
-        this.tokens.setAccessToken(identityToken)
+        const currentAccessToken = this.tokens.getAccessToken();
+        this.tokens.setAccessToken(identityToken);
 
-        const result = await this.exchangeToken(endpoint)
+        const result = await this.exchangeToken(endpoint);
 
-        // If exchange failed, restore previous access token
         if (!result.success && currentAccessToken) {
-            this.tokens.setAccessToken(currentAccessToken)
+            this.tokens.setAccessToken(currentAccessToken);
         }
 
-        return result
+        return result;
     }
 
-    /**
-     * Check if token exchange is needed.
-     * Returns true if we have an identity token but the current access token
-     * doesn't contain a role claim (indicating it's an identity-only token).
-     */
     needsTokenExchange(): boolean {
-        const accessToken = this.tokens.getAccessToken()
-        if (!accessToken) return false
+        const accessToken = this.tokens.getAccessToken();
+        if (!accessToken) return false;
 
-        const claims = this.tokens.decodeJwtPayload(accessToken)
-        // If no role in JWT, token exchange is needed
-        return !claims?.role
+        const claims = this.tokens.decodeJwtPayload(accessToken);
+        return !claims?.role;
     }
 
     // ── Multi-tenant operations ───────────────────────────────────────────────
@@ -493,23 +449,41 @@ export class AuthService {
         return (this.plugin.getAvailableServers?.() ?? []).length > 0;
     }
 
-    // ── Backward compatibility ────────────────────────────────────────────────
+    // ── Backward compatibility (BehaviorSubject-style observable) ─────────────
+
+    /**
+     * @deprecated Use the `user` signal directly with toObservable() if needed.
+     * Example: `toObservable(authService.user)`
+     */
+    get user$() {
+        // For backward compatibility, create an observable-like getter
+        // Consumers should migrate to signals
+        return {
+            subscribe: (observer: { next: (user: User | null) => void }) => {
+                // Immediately emit current value
+                observer.next(this.user());
+                // Note: This doesn't provide reactive updates like a real Observable
+                // Consumers should migrate to signals for reactive updates
+                return { unsubscribe: () => {} };
+            }
+        };
+    }
 
     /** @deprecated Use getCurrentUser()?.user_id instead */
-    getUserId(): number { return this.userSubject.value?.user_id || 0; }
+    getUserId(): number { return this.user()?.user_id || 0; }
 
     /** @deprecated Use getCurrentUser()?.display_name instead */
-    getUserName(): string { return this.userSubject.value?.display_name || ''; }
+    getUserName(): string { return this.user()?.display_name || ''; }
 
     /** @deprecated Use getCurrentUser()?.photo_url instead */
-    getPhotoUrl(): string { return this.userSubject.value?.photo_url || ''; }
+    getPhotoUrl(): string { return this.user()?.photo_url || ''; }
 
     /** @deprecated Use getCurrentUser()?.display_name instead */
-    getDisplayName(): string { return this.userSubject.value?.display_name || ''; }
+    getDisplayName(): string { return this.user()?.display_name || ''; }
 
     /** @deprecated Use `/profile/${getCurrentUser()?.user_id}` instead */
     getProfileUrl(): string {
-        const userId = this.userSubject.value?.user_id;
+        const userId = this.user()?.user_id;
         return userId ? `/profile/${userId}` : '';
     }
 
@@ -523,7 +497,7 @@ export class AuthService {
     }
 
     /** @deprecated Check user.is_email_verified from getCurrentUser() instead */
-    isSigninEmailValid(): boolean { return this.userSubject.value?.is_email_verified || false; }
+    isSigninEmailValid(): boolean { return this.user()?.is_email_verified || false; }
 
     /** @deprecated No longer needed */
     onDialogClose(): void { }

@@ -1,50 +1,59 @@
-/*
- * Public API Surface of ngx-stonescriptphp-client
+/**
+ * @progalaxyelabs/ngx-stonescriptphp-client v2.0.0
+ *
+ * Angular client library for StoneScriptPHP backend framework.
+ *
+ * Breaking changes from v1.x:
+ * - SigninStatusService removed (use AuthService.user signal)
+ * - DbService removed (was empty stub)
+ * - VerifyStatus enum removed
+ * - uploadDrawing/uploadImage removed from ApiConnectionService
+ * - UI components moved to @progalaxyelabs/ngx-stonescriptphp-ui
+ * - FilesService moved to @progalaxyelabs/ngx-stonescriptphp-files-client
+ * - ProviderRegistryService moved to @progalaxyelabs/ngx-stonescriptphp-ui
+ * - Core types now come from @progalaxyelabs/stonescriptphp-client-core
+ * - Auth plugins now come from @progalaxyelabs/stonescriptphp-auth-client
  */
 
 // ── Core setup ────────────────────────────────────────────────────────────────
-export * from './provide';                  // provideNgxStoneScriptPhpClient()
-export * from './auth.plugin';              // AuthPlugin, AUTH_PLUGIN, AuthResult, User, ...
-
-// ── Auth plugins ─────────────────────────────────────────────────────────────
-export * from './plugins/stonescriptphp-auth.plugin'; // StoneScriptPHPAuth, StoneScriptPHPAuthConfig
-export * from './plugins/progalaxyelabs-auth.plugin'; // ProgalaxyElabsAuth, ProgalaxyElabsAuthConfig
+export { provideNgxStoneScriptPhpClient } from './provide';
+export { AUTH_PLUGIN } from './auth.plugin';
 
 // ── Services ──────────────────────────────────────────────────────────────────
-export * from './api-connection.service';
-export * from './auth.service';
-export * from './db.service';
-export * from './log.service';
-export * from './signin-status.service';
-export * from './token.service';
-export * from './csrf.service';
-export * from './files.service';
-export * from './provider-registry.service';
+export { ApiConnectionService } from './api-connection.service';
+export { AuthService, BuiltInProvider, AuthProvider } from './auth.service';
+export { TokenService } from './token.service';
+export { CsrfService } from './csrf.service';
+export { LogService } from './log.service';
 
-// ── Models ────────────────────────────────────────────────────────────────────
-export * from './api-response.model';
-export * from './my-environment.model';
-export * from './files.model';
+// ── Notification Handler ──────────────────────────────────────────────────────
+export { NOTIFICATION_HANDLER, NotificationHandler } from './notification-handler';
 
-// ── UI Components - Embeddable (standalone components) ────────────────────────
-export * from './lib/components/auth-page.component';
-export * from './lib/components/login-dialog.component';
-export * from './lib/components/month-year-picker.component';
-export * from './lib/components/register.component';
-export * from './lib/components/tenant-login.component';
-export * from './lib/components/tenant-register.component';
+// ── Models (re-exported from core) ────────────────────────────────────────────
+export { ApiResponse } from './api-response.model';
+export {
+    MyEnvironmentModel,
+    AuthConfig,
+    AuthMode,
+    AuthServerConfig,
+    AuthResponseMap,
+    OAuthProviderConfig
+} from './my-environment.model';
 
-// ── UI Components - Dialog/Modal wrappers ─────────────────────────────────────
-export * from './lib/components/tenant-login-dialog.component';
-export * from './lib/components/tenant-register-dialog.component';
+// ── Auth types (re-exported from core) ────────────────────────────────────────
+export type {
+    AuthPlugin,
+    AuthResult,
+    User,
+    TenantMembership,
+    OtpSendResponse,
+    OtpVerifyResponse
+} from './auth.plugin';
 
-// ── Re-export types for convenience ──────────────────────────────────────────
-export type { OAuthProviderConfig } from './my-environment.model';
-export { VerifyStatus } from './signin-status.service';
-
-// ── Multi-tenant types ────────────────────────────────────────────────────────
-export type { TenantSelectedEvent, OnboardingNeededEvent, OtpStep } from './lib/components/tenant-login.component';
-export type { TenantCreatedEvent, TenantRegisterRequestEvent } from './lib/components/tenant-register.component';
-
-// ── OTP types ────────────────────────────────────────────────────────────────
-export type { OtpSendResponse, OtpVerifyResponse } from './auth.plugin';
+// ── Auth plugins (re-exported from auth-client for convenience) ───────────────
+export {
+    StoneScriptPHPAuth,
+    StoneScriptPHPAuthConfig,
+    ProgalaxyElabsAuth,
+    ProgalaxyElabsAuthConfig
+} from '@progalaxyelabs/stonescriptphp-auth-client';

@@ -1,51 +1,61 @@
-import { Injectable } from '@angular/core';
+import { Injectable, Inject, Optional } from '@angular/core';
 import { TokenService } from './token.service';
-import { ApiResponse } from './api-response.model';
-import { MyEnvironmentModel } from './my-environment.model';
+import { ApiResponse, MyEnvironmentModel } from '@progalaxyelabs/stonescriptphp-client-core';
 import { AuthService } from './auth.service';
+import { NOTIFICATION_HANDLER, NotificationHandler } from './notification-handler';
 
+/**
+ * API connection service for making authenticated HTTP requests.
+ *
+ * Features:
+ * - Automatic Bearer token injection
+ * - Automatic 401 retry with token refresh
+ * - Standard ApiResponse<T> format handling
+ * - Optional notification handler for error display
+ */
 @Injectable({
     providedIn: 'root'
 })
 export class ApiConnectionService {
 
-    private host = '' // base URL without trailing slash
+    private host = ''; // base URL without trailing slash
 
     constructor(
         private tokens: TokenService,
-        private environment: MyEnvironmentModel,
-        private authService: AuthService
+        @Inject(MyEnvironmentModel) private environment: MyEnvironmentModel,
+        private authService: AuthService,
+        @Optional() @Inject(NOTIFICATION_HANDLER) private notificationHandler: NotificationHandler | null
     ) {
-        this.host = environment.apiServer.host
+        this.host = environment.apiServer.host;
     }
 
     private async request<DataType>(url: string, options: any, data: any | null): Promise<ApiResponse<DataType>> {
         try {
             if (data !== null) {
-                const body = JSON.stringify(data)
-                options.body = body || {}
+                const body = JSON.stringify(data);
+                options.body = body || {};
             }
 
-            const accessTokenIncluded = this.includeAccessToken(options)
+            const accessTokenIncluded = this.includeAccessToken(options);
 
-            let response: Response = await fetch(url, options)
+            let response: Response = await fetch(url, options);
 
             if (response.status === 401 && accessTokenIncluded) {
-                response = await this.refreshAndRetry(url, options, response)
+                response = await this.refreshAndRetry(url, options, response);
             }
 
             if (response.ok) {
-                const json = await response.json()
-                return new ApiResponse<DataType>(json.status, json.data, json.message)
+                const json = await response.json();
+                return new ApiResponse<DataType>(json.status, json.data, json.message);
             }
 
             if (response.status === 401) {
-                this.authService.clearSession()
+                this.authService.clearSession();
             }
 
-            return await this.handleError<DataType>(response, options.method || 'GET', url)
+            return await this.handleError<DataType>(response, options.method || 'GET', url);
         } catch (error) {
-            return await this.handleError<DataType>(error, options.method || 'GET', url)
+            return await this.handleError<DataType>(error, options.method || 'GET', url);
         }
     }
 
@@ -62,9 +72,6 @@ export class ApiConnectionService {
         }
 
         // Preserve error metadata for proper classification
-        // Network errors (TypeError from fetch) have no status
-        // HTTP errors (Response) have status property
-        // URL and method are captured BEFORE fetch runs so they're available for TypeError cases
         const errorMetadata: any = {
             originalError: error,
             responseBody,
@@ -74,70 +81,77 @@ export class ApiConnectionService {
             method: method || null
         };
 
-        return new ApiResponse<DataType>('error', errorMetadata, responseBody?.message || '')
+        const errorMessage = responseBody?.message || 'An error occurred';
+
+        // Notify via handler if provided
+        if (this.notificationHandler && errorMessage) {
+            this.notificationHandler.error(errorMessage);
+        }
+
+        return new ApiResponse<DataType>('error', errorMetadata, errorMessage);
     }
 
     async get<DataType>(endpoint: string, queryParamsObj?: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + endpoint + this.buildQueryString(queryParamsObj)
-        const fetchOptions: RequestInit = { mode: 'cors', redirect: 'error' }
-        return this.request(url, fetchOptions, null)
+        const url = this.host + endpoint + this.buildQueryString(queryParamsObj);
+        const fetchOptions: RequestInit = { mode: 'cors', redirect: 'error' };
+        return this.request(url, fetchOptions, null);
     }
 
     async post<DataType>(pathWithQueryParams: string, data: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + pathWithQueryParams
+        const url = this.host + pathWithQueryParams;
         const fetchOptions: RequestInit = {
             method: 'POST',
             mode: 'cors',
             redirect: 'error',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
-        }
-        return this.request(url, fetchOptions, data)
+        };
+        return this.request(url, fetchOptions, data);
     }
 
     async put<DataType>(pathWithQueryParams: string, data: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + pathWithQueryParams
+        const url = this.host + pathWithQueryParams;
         const fetchOptions: RequestInit = {
             method: 'PUT',
             mode: 'cors',
             redirect: 'error',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
-        }
-        return this.request(url, fetchOptions, data)
+        };
+        return this.request(url, fetchOptions, data);
     }
 
     async patch<DataType>(pathWithQueryParams: string, data: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + pathWithQueryParams
+        const url = this.host + pathWithQueryParams;
         const fetchOptions: RequestInit = {
             method: 'PATCH',
             mode: 'cors',
             redirect: 'error',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
-        }
-        return this.request(url, fetchOptions, data)
+        };
+        return this.request(url, fetchOptions, data);
     }
 
     async delete<DataType>(endpoint: string, queryParamsObj?: any): Promise<ApiResponse<DataType>> {
-        const url = this.host + endpoint + this.buildQueryString(queryParamsObj)
-        const fetchOptions: RequestInit = { method: 'DELETE', mode: 'cors', redirect: 'error' }
-        return this.request(url, fetchOptions, null)
+        const url = this.host + endpoint + this.buildQueryString(queryParamsObj);
+        const fetchOptions: RequestInit = { method: 'DELETE', mode: 'cors', redirect: 'error' };
+        return this.request(url, fetchOptions, null);
     }
 
     private includeAccessToken(options: any): boolean {
-        const accessToken = this.tokens.getAccessToken()
-        if (!accessToken) return false
-        if (!options.headers) options.headers = {}
-        options.headers['Authorization'] = 'Bearer ' + accessToken
-        return true
+        const accessToken = this.tokens.getAccessToken();
+        if (!accessToken) return false;
+        if (!options.headers) options.headers = {};
+        options.headers['Authorization'] = 'Bearer ' + accessToken;
+        return true;
     }
 
     private async refreshAndRetry(url: string, fetchOptions: any, response: Response): Promise<Response> {
-        const refreshed = await this.authService.refresh()
-        if (!refreshed) return response
-        fetchOptions.headers['Authorization'] = 'Bearer ' + this.tokens.getAccessToken()
-        return fetch(url, fetchOptions)
+        const refreshed = await this.authService.refresh();
+        if (!refreshed) return response;
+        fetchOptions.headers['Authorization'] = 'Bearer ' + this.tokens.getAccessToken();
+        return fetch(url, fetchOptions);
     }
 
     /**
@@ -145,40 +159,18 @@ export class ApiConnectionService {
      * Kept public for backward compatibility.
      */
     async refreshAccessToken(): Promise<boolean> {
-        return this.authService.refresh()
+        return this.authService.refresh();
     }
 
     buildQueryString(options?: any): string {
-        if (options === undefined) return ''
-        const array = []
+        if (options === undefined) return '';
+        const array = [];
         for (const key in options) {
             if (options.hasOwnProperty(key) && options[key] !== null && options[key] !== undefined) {
-                array.push(encodeURIComponent(key) + '=' + encodeURIComponent(options[key]))
+                array.push(encodeURIComponent(key) + '=' + encodeURIComponent(options[key]));
             }
         }
-        const str = array.join('&')
-        return str ? '?' + str : ''
-    }
-
-    /**
-     * Upload a drawing (uses upload server if configured, otherwise API server)
-     * @deprecated Platform-specific method - consider moving to platform service
-     */
-    async uploadDrawing<DataType>(formData: FormData): Promise<ApiResponse<DataType>> {
-        const uploadHost = (this.environment as any).uploadServer?.host || this.host
-        const url = uploadHost + '/upload/drawing'
-        const fetchOptions: RequestInit = { method: 'POST', mode: 'cors', redirect: 'error', body: formData }
-        return this.request(url, fetchOptions, null)
-    }
-
-    /**
-     * Upload an image (uses upload server if configured, otherwise API server)
-     * @deprecated Platform-specific method - consider moving to platform service
-     */
-    async uploadImage<DataType>(formData: FormData): Promise<ApiResponse<DataType>> {
-        const uploadHost = (this.environment as any).uploadServer?.host || this.host
-        const url = uploadHost + '/upload/image'
-        const fetchOptions: RequestInit = { method: 'POST', mode: 'cors', redirect: 'error', body: formData }
-        return this.request(url, fetchOptions, null)
+        const str = array.join('&');
+        return str ? '?' + str : '';
     }
 }
