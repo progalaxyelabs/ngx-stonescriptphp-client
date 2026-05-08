@@ -25,6 +25,7 @@ export { AuthService, BuiltInProvider, AuthProvider } from './auth.service';
 export { TokenService } from './token.service';
 export { CsrfService } from './csrf.service';
 export { LogService } from './log.service';
+export { AnalyticsService } from './analytics.service';
 
 // ── Notification Handler ──────────────────────────────────────────────────────
 export { NOTIFICATION_HANDLER, NotificationHandler } from './notification-handler';
