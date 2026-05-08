@@ -163,11 +163,25 @@ export class ApiConnectionService {
     }
 
     buildQueryString(options?: any): string {
-        if (options === undefined) return '';
-        const array = [];
+        if (options === undefined || options === null) return '';
+        const array: string[] = [];
         for (const key in options) {
             if (options.hasOwnProperty(key) && options[key] !== null && options[key] !== undefined) {
-                array.push(encodeURIComponent(key) + '=' + encodeURIComponent(options[key]));
+                const value = options[key];
+                if (typeof value === 'object' && !Array.isArray(value)) {
+                    // Flatten nested objects into top-level params.
+                    // e.g. { filters: { status: 'active', item_form_id: 5 } }
+                    //   → status=active&item_form_id=5
+                    // This prevents passing { filters: {...} } from producing
+                    // "filters=%5Bobject%20Object%5D" in the URL.
+                    for (const innerKey in value) {
+                        if (value.hasOwnProperty(innerKey) && value[innerKey] !== null && value[innerKey] !== undefined) {
+                            array.push(encodeURIComponent(innerKey) + '=' + encodeURIComponent(value[innerKey]));
+                        }
+                    }
+                } else {
+                    array.push(encodeURIComponent(key) + '=' + encodeURIComponent(value));
+                }
             }
         }
         const str = array.join('&');
