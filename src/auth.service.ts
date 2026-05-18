@@ -178,28 +178,6 @@ export class AuthService {
         this.updateUser(null);
     }
 
-    async checkSession(serverName?: string): Promise<boolean> {
-        if (this.tokens.hasValidAccessToken()) {
-            // If we already have a stored user, update their role from the current JWT
-            const storedUser = this.getCurrentUser();
-            if (storedUser && !storedUser.role) {
-                const enriched = this.enrichUserWithJwtRole(storedUser);
-                if (enriched.role) this.updateUser(enriched);
-            }
-            return true;
-        }
-        const result = await this.plugin.checkSession();
-        if (result.success && result.accessToken) {
-            this.tokens.setAccessToken(result.accessToken);
-            if (result.user) {
-                this.updateUser(this.enrichUserWithJwtRole(result.user, result.accessToken));
-            }
-            return true;
-        }
-        this.tokens.clear();
-        this.updateUser(null);
-        return false;
-    }
 
     /**
      * Refresh the access token. Called by ApiConnectionService on 401.
@@ -505,10 +483,4 @@ export class AuthService {
     /** @deprecated No longer needed */
     closeSocialAuthDialog(): void { }
 
-    /** @deprecated Use checkEmail() from the plugin directly */
-    async getUserProfile(email: string, serverName?: string): Promise<User | null> {
-        if (!this.plugin.checkEmail) return null;
-        const result = await this.plugin.checkEmail(email);
-        return result.exists ? result.user : null;
-    }
 }
