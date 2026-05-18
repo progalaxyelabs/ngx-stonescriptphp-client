@@ -145,8 +145,47 @@ export class AuthService {
             return { success: false, message: 'OAuth not supported by the configured auth plugin' };
         }
         const result = await this.plugin.loginWithProvider(provider);
+        // OAuth pending lifecycle (auth server >= 2026-05-18):
+        // If oauthPending=true, the accessToken is a short-lived pre-auth JWT.
+        // We still store it so authenticated requests during the next gate work,
+        // but the caller MUST eventually call promoteOAuth(state) to commit or
+        // abandonOAuth(state) to discard. Do not treat oauthPending as a final
+        // successful login — caller should check result.oauthPending and route
+        // accordingly.
         if (result.success) this.storeAuthResult(result);
         return result;
+    }
+
+    /**
+     * Commit a pending OAuth connection (created by an OAuth callback when the
+     * email was new). Call this after the user completes the next gate (e.g.
+     * tenant creation). Returns a full AuthResult with the final JWT.
+     */
+    async promoteOAuth(oauthState: string): Promise<AuthResult> {
+        if (!this.plugin.promoteOAuth) {
+            return { success: false, message: 'promoteOAuth not supported by the configured auth plugin' };
+        }
+        const result = await this.plugin.promoteOAuth(oauthState);
+        if (result.success) this.storeAuthResult(result);
+        return result;
+    }
+
+    /**
+     * Discard a pending OAuth connection (user clicked "Start Over" or closed
+     * the flow without committing). Idempotent. Also clears the pre-auth JWT
+     * from local token storage so the session is fully reset.
+     */
+    async abandonOAuth(oauthState: string): Promise<{ success: boolean }> {
+        const fallback = { success: true };
+        try {
+            if (!this.plugin.abandonOAuth) return fallback;
+            const result = await this.plugin.abandonOAuth(oauthState);
+            return result ?? fallback;
+        } finally {
+            // Always clear local token state — the pre-auth JWT is no longer valid
+            this.tokens.clear();
+            this.updateUser(null);
+        }
     }
 
     async register(

@@ -1,6 +1,6 @@
 {
   "name": "@progalaxyelabs/ngx-stonescriptphp-client",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Angular client library for StoneScriptPHP backend framework",
   "keywords": [
     "angular",
@@ -32,7 +32,7 @@
   "peerDependencies": {
     "@angular/common": "^19.0.0 || ^20.0.0",
     "@angular/core": "^19.0.0 || ^20.0.0",
-    "@progalaxyelabs/stonescriptphp-client-core": "^1.0.0"
+    "@progalaxyelabs/stonescriptphp-client-core": "^1.2.1"
   },
   "dependencies": {
     "tslib": "^2.8.0"
@@ -42,8 +42,8 @@
     "@angular/compiler": "20.3.17",
     "@angular/compiler-cli": "20.3.17",
     "@angular/core": "20.3.17",
-    "@progalaxyelabs/stonescriptphp-auth-client": "^1.1.0",
-    "@progalaxyelabs/stonescriptphp-client-core": "^1.1.0",
+    "@progalaxyelabs/stonescriptphp-auth-client": "^1.2.0",
+    "@progalaxyelabs/stonescriptphp-client-core": "^1.2.1",
     "ng-packagr": "^20.0.0",
     "typescript": "~5.8.0"
   },
