@@ -280,18 +280,18 @@ export class AuthService {
 
     // ── OTP authentication ─────────────────────────────────────────────────────
 
-    async sendOtp(identifier: string, mode?: 'login' | 'signup', nameHint?: string): Promise<OtpSendResponse> {
+    async sendOtp(identifier: string, mode: 'login' | 'signup', nameHint?: string): Promise<OtpSendResponse> {
         if (!this.plugin.sendOtp) {
             return { success: false, identifier_type: 'email', masked_identifier: '', expires_in: 0, resend_after: 0 };
         }
         return this.plugin.sendOtp(identifier, mode, nameHint);
     }
 
-    async verifyOtp(identifier: string, code: string): Promise<OtpVerifyResponse> {
+    async verifyOtp(identifier: string, code: string, mode: 'login' | 'register'): Promise<OtpVerifyResponse> {
         if (!this.plugin.verifyOtp) {
             return { success: false, verified_token: '' };
         }
-        return this.plugin.verifyOtp(identifier, code);
+        return this.plugin.verifyOtp(identifier, code, mode);
     }
 
     async identityLogin(verifiedToken: string): Promise<AuthResult> {
