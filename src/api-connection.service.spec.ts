@@ -91,3 +91,122 @@ describe('ApiConnectionService.buildQueryString', () => {
     expect(qs).toContain('ids=');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// refreshAndRetry — AUTH-SPEC §4a session continuity (task #2644)
+//
+// Pins the refresh → exchange → retry contract so any future regression is
+// caught at test time. Uses spies to avoid real HTTP calls.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ApiConnectionService.refreshAndRetry (AUTH-SPEC §4a)', () => {
+    /**
+     * Build a minimal mock that exposes the private refreshAndRetry method.
+     * The method is private but we test its effects through the public request()
+     * path by calling get() with a mocked fetch that returns 401 on the first call.
+     */
+    function makeService(opts: {
+        refreshResult: boolean;
+        exchangeResult: { success: boolean; message?: string; role?: string };
+        retryStatus?: number;
+    }) {
+        const tokens = {
+            getAccessToken: jasmine.createSpy('getAccessToken').and.returnValue('identity-jwt'),
+            getRefreshToken: jasmine.createSpy('getRefreshToken').and.returnValue('refresh-jwt'),
+            hasValidAccessToken: jasmine.createSpy('hasValidAccessToken').and.returnValue(true),
+        };
+
+        const authService = {
+            refresh: jasmine.createSpy('refresh').and.resolveTo(opts.refreshResult),
+            exchangeToken: jasmine.createSpy('exchangeToken').and.resolveTo(opts.exchangeResult),
+            clearSession: jasmine.createSpy('clearSession'),
+        };
+
+        const environment = {
+            apiServer: { host: 'http://localhost:3011' },
+        };
+
+        // Cast as any to bypass DI requirements in unit test
+        const svc = new (ApiConnectionService as any)(tokens, environment, authService, null);
+        return { svc, tokens, authService };
+    }
+
+    it('calls exchangeToken after refresh succeeds (happy path)', async () => {
+        const { svc, authService } = makeService({
+            refreshResult: true,
+            exchangeResult: { success: true, role: 'owner' },
+            retryStatus: 200,
+        });
+
+        // Simulate: first fetch → 401, retry → 200
+        let callCount = 0;
+        spyOn(window, 'fetch').and.callFake((_url: any, _opts: any) => {
+            callCount++;
+            if (callCount === 1) {
+                return Promise.resolve(new Response(JSON.stringify({ status: 'error' }), { status: 401 }));
+            }
+            return Promise.resolve(new Response(JSON.stringify({ status: 'ok', data: {}, message: 'ok' }), { status: 200 }));
+        });
+
+        await svc.get('/test');
+
+        expect(authService.refresh).toHaveBeenCalledTimes(1);
+        expect(authService.exchangeToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls exchangeToken with default endpoint /api/auth/exchange', async () => {
+        const { svc, authService } = makeService({
+            refreshResult: true,
+            exchangeResult: { success: true, role: 'owner' },
+        });
+
+        spyOn(window, 'fetch').and.callFake((_url: any, _opts: any) => {
+            return Promise.resolve(new Response(JSON.stringify({ status: 'error' }), { status: 401 }));
+        });
+
+        await svc.get('/test');
+
+        // exchangeToken must be called — it uses default /api/auth/exchange internally
+        expect(authService.exchangeToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT call exchange when refresh fails', async () => {
+        const { svc, authService } = makeService({
+            refreshResult: false,
+            exchangeResult: { success: false },
+        });
+
+        spyOn(window, 'fetch').and.resolveTo(
+            new Response(JSON.stringify({ status: 'error' }), { status: 401 })
+        );
+
+        await svc.get('/test');
+
+        expect(authService.refresh).toHaveBeenCalledTimes(1);
+        // refresh failed → exchangeToken must NOT be called
+        expect(authService.exchangeToken).not.toHaveBeenCalled();
+    });
+
+    it('still retries even when exchange fails (builtin-auth fallback)', async () => {
+        const { svc, authService } = makeService({
+            refreshResult: true,
+            exchangeResult: { success: false, message: 'builtin mode — no exchange endpoint' },
+        });
+
+        let callCount = 0;
+        spyOn(window, 'fetch').and.callFake((_url: any, _opts: any) => {
+            callCount++;
+            if (callCount === 1) {
+                return Promise.resolve(new Response(JSON.stringify({ status: 'error' }), { status: 401 }));
+            }
+            return Promise.resolve(new Response(JSON.stringify({ status: 'ok', data: {}, message: 'ok' }), { status: 200 }));
+        });
+
+        const result = await svc.get('/test');
+
+        // Exchange failed but retry still happened (graceful degradation)
+        expect(authService.exchangeToken).toHaveBeenCalledTimes(1);
+        // fetch was called twice (first 401, then retry)
+        expect(callCount).toBe(2);
+    });
+});

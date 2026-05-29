@@ -148,8 +148,27 @@ export class ApiConnectionService {
     }
 
     private async refreshAndRetry(url: string, fetchOptions: any, response: Response): Promise<Response> {
+        // Step 1: Refresh identity token (AUTH-SPEC §4a session continuity)
         const refreshed = await this.authService.refresh();
         if (!refreshed) return response;
+
+        // Step 2: Exchange fresh identity token for platform JWT.
+        // Auth-SPEC §4a: "refresh → exchange → retry".
+        // Non-fatal: if exchange fails (builtin-auth mode, no tenant yet, or
+        // exchange endpoint not configured), we fall through and retry with
+        // whatever access token is current (identity JWT). The caller's 401
+        // handler will deal with the result.
+        const exchangeResult = await this.authService.exchangeToken();
+        if (!exchangeResult.success) {
+            // Exchange failed — log at debug level; retry may still succeed in
+            // builtin-auth mode where the refreshed identity JWT IS the platform JWT.
+            if (typeof console !== 'undefined') {
+                console.debug('[ApiConnectionService] Token exchange after refresh failed:', exchangeResult.message);
+            }
+        }
+
+        // Step 3: Retry with the latest token (platform JWT if exchange succeeded,
+        // identity JWT otherwise)
         fetchOptions.headers['Authorization'] = 'Bearer ' + this.tokens.getAccessToken();
         return fetch(url, fetchOptions);
     }
