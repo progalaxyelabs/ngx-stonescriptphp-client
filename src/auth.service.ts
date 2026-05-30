@@ -289,9 +289,23 @@ export class AuthService {
 
     async verifyOtp(identifier: string, code: string, mode: 'login' | 'register'): Promise<OtpVerifyResponse> {
         if (!this.plugin.verifyOtp) {
-            return { success: false, verified_token: '' };
+            return { success: false };
         }
-        return this.plugin.verifyOtp(identifier, code, mode);
+        const result = await this.plugin.verifyOtp(identifier, code, mode);
+        // OTP verify is terminal (AUTH-SPEC §1c/§1d): store tokens when the server
+        // returns a full bundle so the app is immediately authenticated on success.
+        if (result.success && result.accessToken) {
+            this.storeAuthResult({
+                success: true,
+                accessToken: result.accessToken,
+                refreshToken: result.refreshToken,
+                user: result.user,
+                membership: result.membership,
+                memberships: result.memberships,
+                isNewIdentity: result.isNewIdentity,
+            });
+        }
+        return result;
     }
 
     async identityLogin(verifiedToken: string): Promise<AuthResult> {
