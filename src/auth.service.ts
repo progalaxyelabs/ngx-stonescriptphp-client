@@ -355,6 +355,20 @@ export class AuthService {
                 const claims = this.tokens.decodeJwtPayload(data.data.access_token);
                 const role = claims?.role || data.data.role;
 
+                // AUTH-SPEC §4a: after exchange, the platform JWT must carry tenant_id when
+                // the user is in a tenant session. Log a warning if unexpectedly missing —
+                // this indicates a server-side auth issue, not a client bug. The server
+                // guarantees tenant_id preservation (identity JWT without it returns 401).
+                if (typeof console !== 'undefined' && !claims?.tenant_id) {
+                    const identityClaims = this.tokens.decodeJwtPayload(identityToken);
+                    if (identityClaims?.tenant_id) {
+                        console.warn(
+                            '[AuthService] exchangeToken: identity JWT had tenant_id but platform JWT does not.' +
+                            ' This indicates a server-side exchange issue — tenant context may be lost.'
+                        );
+                    }
+                }
+
                 const currentUser = this.getCurrentUser();
                 if (currentUser && role) {
                     this.updateUser({ ...currentUser, role });
