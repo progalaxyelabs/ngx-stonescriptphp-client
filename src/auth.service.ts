@@ -292,11 +292,11 @@ export class AuthService {
 
     // ── OTP authentication ─────────────────────────────────────────────────────
 
-    async sendOtp(identifier: string, mode: 'login' | 'signup', nameHint?: string): Promise<OtpSendResponse> {
+    async sendOtp(identifier: string, mode: 'login' | 'signup', displayName?: string): Promise<OtpSendResponse> {
         if (!this.plugin.sendOtp) {
             return { success: false, identifier_type: 'email', masked_identifier: '', expires_in: 0, resend_after: 0 };
         }
-        return this.plugin.sendOtp(identifier, mode, nameHint);
+        return this.plugin.sendOtp(identifier, mode, displayName);
     }
 
     async verifyOtp(identifier: string, code: string, mode: 'login' | 'register'): Promise<OtpVerifyResponse> {

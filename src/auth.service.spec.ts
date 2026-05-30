@@ -128,3 +128,85 @@ describe('AuthService.refresh() — AUTH-SPEC §4a tenant_id preservation', () =
     expect(result).toBeFalse();
   });
 });
+
+// ── AUTH-SPEC §1b: OTP register-send displayName parameter ───────────────────
+//
+// Per spec §1b: `display_name` is the required field name for OTP register-send.
+// The AuthService.sendOtp() method must expose `displayName` as the 3rd parameter
+// (not the old `nameHint` name) to align with spec terminology. The plugin maps
+// this positional argument to the HTTP body field `display_name`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('AuthService.sendOtp() — AUTH-SPEC §1b displayName parameter', () => {
+  let service: AuthService;
+
+  function build(pluginOverrides: Partial<any> = {}) {
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: MyEnvironmentModel, useValue: ENV_STUB },
+        { provide: AUTH_PLUGIN, useValue: makePluginStub(pluginOverrides) },
+      ],
+    });
+    service = TestBed.inject(AuthService);
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('passes displayName as 3rd positional arg to plugin.sendOtp (signup mode)', async () => {
+    // Capture what the plugin receives. AUTH-SPEC §1b: `display_name` is required
+    // for register-send. The service passes it as the 3rd positional argument.
+    const captured: { identifier: string; mode: string; displayName?: string }[] = [];
+    build({
+      sendOtp: async (identifier: string, mode: string, displayName?: string) => {
+        captured.push({ identifier, mode, displayName });
+        return {
+          success: true,
+          identifier_type: 'email',
+          masked_identifier: 'u••r@example.com',
+          expires_in: 300,
+          resend_after: 60,
+        };
+      }
+    });
+
+    await service.sendOtp('user@example.com', 'signup', 'John Doe');
+
+    expect(captured.length).toBe(1);
+    expect(captured[0].identifier).toBe('user@example.com');
+    expect(captured[0].mode).toBe('signup');
+    // Verify the display name reaches the plugin (3rd positional arg)
+    expect(captured[0].displayName).toBe('John Doe');
+  });
+
+  it('passes undefined displayName for login mode (no display_name on login)', async () => {
+    const captured: { displayName?: string }[] = [];
+    build({
+      sendOtp: async (_identifier: string, _mode: string, displayName?: string) => {
+        captured.push({ displayName });
+        return {
+          success: true,
+          identifier_type: 'email',
+          masked_identifier: 'u••r@example.com',
+          expires_in: 300,
+          resend_after: 60,
+        };
+      }
+    });
+
+    await service.sendOtp('user@example.com', 'login');
+
+    expect(captured.length).toBe(1);
+    // Login mode: no display_name — must be undefined, not an empty string
+    expect(captured[0].displayName).toBeUndefined();
+  });
+
+  it('returns fallback response when plugin has no sendOtp', async () => {
+    // Plugin without sendOtp — AuthService must return a safe no-op response
+    build(); // makePluginStub has no sendOtp
+
+    const result = await service.sendOtp('user@example.com', 'signup', 'Jane');
+
+    expect(result.success).toBeFalse();
+    expect(result.identifier_type).toBe('email');
+  });
+});
