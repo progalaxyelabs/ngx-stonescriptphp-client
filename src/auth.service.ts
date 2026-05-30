@@ -220,7 +220,19 @@ export class AuthService {
 
     /**
      * Refresh the access token. Called by ApiConnectionService on 401.
-     * @returns true if token was refreshed, false if refresh failed
+     *
+     * **Tenant context preservation (AUTH-SPEC §4a):**
+     * When the existing JWT carries `tenant_id`, the refreshed JWT preserves it.
+     * Tenant context is carried in the **refresh token's own claims** — preservation
+     * is guaranteed server-side and does NOT depend on the `access_token` field.
+     * This client does nothing special for tenant preservation; it simply stores
+     * the new access_token returned by the server.
+     *
+     * > An implementation that reads tenant context from the access_token field
+     * > reintroduces the "lost tenant_id after provision" bug whenever the client
+     * > omits it. The server uses refresh_token claims exclusively.
+     *
+     * @returns true if token was refreshed, false if refresh failed (session cleared)
      */
     async refresh(): Promise<boolean> {
         const newToken = await this.plugin.refresh(
