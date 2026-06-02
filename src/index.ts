@@ -19,6 +19,15 @@
 export { provideNgxStoneScriptPhpClient } from './provide';
 export { AUTH_PLUGIN } from './auth.plugin';
 
+// ── Route guards (SPEC §7) ──────────────────────────────────────────────────
+export { authGuard, loginGuard, subscriptionGuard, NGX_GUARD_CONFIG } from './guards';
+export {
+    NgxGuardConfig,
+    NgxGuardConfigInput,
+    NgxGuardRoutes,
+    DEFAULT_GUARD_CONFIG
+} from './guard-config';
+
 // ── Services ──────────────────────────────────────────────────────────────────
 export { ApiConnectionService } from './api-connection.service';
 export { AuthService, BuiltInProvider, AuthProvider } from './auth.service';

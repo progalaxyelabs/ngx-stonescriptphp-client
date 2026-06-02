@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./out",
+    "rootDir": ".."
+  },
+  "include": ["guard-logic.test.ts", "../src/guard-logic.ts", "../src/guard-config.ts"]
+}

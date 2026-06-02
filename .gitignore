@@ -6,6 +6,7 @@
 /out-tsc
 /bazel-out
 *.tsbuildinfo
+/tests/out
 
 # Node
 /node_modules
@@ -86,3 +87,4 @@ Thumbs.db
 
 # Project-specific
 project-info.yaml
+.project-id

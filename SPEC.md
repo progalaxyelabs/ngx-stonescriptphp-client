@@ -32,13 +32,13 @@ Password-based login is supported for backward compatibility with StoneScriptPHP
 | Reactive auth state (`user$` observable) | Yes |
 | Multi-tenant support (tenant selection, onboarding checks) | Yes |
 | Multi-server auth support | Yes |
+| Route guards (`authGuard`, `loginGuard`, `subscriptionGuard`) | Yes — see §7 |
 
 ### 1.3 What the Library Does NOT Provide
 
 | Capability | Not provided |
 |------------|--------------|
 | Routing or route definitions | Consuming app responsibility |
-| Route guards (auth, subscription, redirect) | Consuming app responsibility |
 | Dashboard, settings, or data table pages | Consuming app responsibility |
 | Onboarding wizard | Consuming app responsibility |
 | Subscription management UI | Consuming app responsibility |
@@ -401,7 +401,9 @@ module.exports = {
 
 ### 7.1 Library-Provided Guards
 
-The library SHOULD provide the following route guards as injectable functions. Consuming apps import and apply them to their route definitions.
+The library provides the following route guards as injectable `CanActivateFn`s (exported from the package root). Consuming apps import and apply them to their route definitions, and configure redirect targets via the 3rd argument of `provideNgxStoneScriptPhpClient` (§7.2).
+
+> **authGuard also performs the AUTH-SPEC exchange-before-API step:** when the stored token is still an identity JWT, it exchanges it for a platform token (detected by `token_type === 'platform'`) before allowing the route to load. An already-exchanged platform token is **never** re-exchanged.
 
 #### authGuard
 
@@ -463,7 +465,7 @@ export const myCustomGuard: CanActivateFn = (route, state) => {
 };
 ```
 
-> **Implementation gap:** The library currently ships NO route guards. All guards are implemented per-platform in consuming apps. The guards described above SHOULD be extracted into the library as reusable, configurable functions.
+> **Status:** The guards described above are provided by the library as of v2.4.0 (`authGuard`, `loginGuard`, `subscriptionGuard`, exported from the package root, configured via `NGX_GUARD_CONFIG` / the 3rd arg of `provideNgxStoneScriptPhpClient`). Consuming apps should adopt these rather than hand-rolling per-platform guards.
 
 ---
 
