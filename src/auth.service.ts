@@ -385,7 +385,11 @@ export class AuthService {
                 // the user is in a tenant session. Log a warning if unexpectedly missing —
                 // this indicates a server-side auth issue, not a client bug. The server
                 // guarantees tenant_id preservation (identity JWT without it returns 401).
-                if (typeof console !== 'undefined' && !claims?.tenant_id) {
+                //
+                // Note: RsaJwtHandler wraps platform claims inside a 'data' key, so we check
+                // both the flat structure and the wrapped structure to avoid false-alarm warnings.
+                const platformTenantId = claims?.tenant_id ?? (claims as any)?.data?.tenant_id;
+                if (typeof console !== 'undefined' && !platformTenantId) {
                     const identityClaims = this.tokens.decodeJwtPayload(identityToken);
                     if (identityClaims?.tenant_id) {
                         console.warn(
