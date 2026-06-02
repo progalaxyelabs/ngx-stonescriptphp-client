@@ -405,16 +405,24 @@ The library provides the following route guards as injectable `CanActivateFn`s (
 
 > **authGuard also performs the AUTH-SPEC exchange-before-API step:** when the stored token is still an identity JWT, it exchanges it for a platform token (detected by `token_type === 'platform'`) before allowing the route to load. An already-exchanged platform token is **never** re-exchanged.
 
+#### Tenant modes (`requireTenant`, §7.2)
+
+The guards support two tenant models, selected by `requireTenant` (default `true`):
+
+- **Tenant-aware** (`requireTenant: true`, default) — multi-tenant apps (e.g. medstoreapp). Users select/belong to a tenant; the JWT carries `tenant_id`. Tables below apply as written.
+- **Tenant-less** (`requireTenant: false`) — single-plan B2C apps (e.g. webmeteor) whose platform tokens carry no `tenant_id` by design. The tenant gate and onboarding bounce are disabled; see the per-guard overrides.
+
 #### authGuard
 
-Protects routes that require authentication.
+Protects routes that require authentication. (In all modes, an identity JWT is first exchanged for a platform token — see the note above — before these conditions are evaluated.)
 
 | Condition | Action |
 |-----------|--------|
 | Not authenticated | Redirect to app's login route |
-| Authenticated, no tenant selected (JWT `tenant_id` is absent or `'none'`) and URL is not an onboarding path | Redirect to app's onboarding route |
-| Authenticated, no tenant, URL is onboarding path | Allow |
+| **Tenant-aware** + authenticated, no tenant (JWT `tenant_id` absent or `'none'`), URL not an onboarding path | Redirect to app's onboarding route |
+| **Tenant-aware** + authenticated, no tenant, URL is onboarding path | Allow |
 | Authenticated with tenant | Allow |
+| **Tenant-less** + authenticated (platform token) | Allow (no tenant gate, no onboarding bounce) |
 
 #### loginGuard
 
@@ -422,8 +430,9 @@ Prevents authenticated users from seeing the login page.
 
 | Condition | Action |
 |-----------|--------|
-| Authenticated with tenant | Redirect to app's dashboard route |
-| Authenticated without tenant | Allow (login page handles tenant selection) |
+| **Tenant-aware** + authenticated with tenant | Redirect to app's dashboard route |
+| **Tenant-aware** + authenticated without tenant | Allow (login page handles tenant selection) |
+| **Tenant-less** + authenticated | Redirect to app's dashboard route |
 | Not authenticated | Allow |
 
 #### subscriptionGuard
@@ -448,7 +457,14 @@ provideNgxStoneScriptPhpClient(environment, plugin, {
     dashboard: '/admin/dashboard',      // where loginGuard redirects authenticated users
     onboarding: '/admin/onboarding',    // onboarding path prefix (bypass authGuard tenant check)
     subscriptionError: '/subscription-error'  // where subscriptionGuard redirects on 4xx
-  }
+  },
+  requireTenant: true,                  // default true (multi-tenant). Set false for
+                                        //   tenant-less single-plan B2C: disables the
+                                        //   authGuard tenant gate / onboarding bounce and
+                                        //   makes loginGuard send any authed user to dashboard.
+                                        //   In tenant-less mode `routes.onboarding` is unused.
+  exchangeEndpoint: 'api/auth/exchange',        // authGuard identity→platform exchange (default)
+  subscriptionStatusEndpoint: 'subscription/status'  // subscriptionGuard probe (default)
 });
 ```
 

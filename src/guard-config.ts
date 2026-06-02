@@ -36,6 +36,17 @@ export interface NgxGuardConfig {
      * Default: 'subscription/status'.
      */
     subscriptionStatusEndpoint: string;
+    /**
+     * Tenant mode (SPEC §7.1).
+     *   `true`  (default) — multi-tenant: authGuard bounces tenant-less users to
+     *           onboarding; loginGuard lets tenant-less users stay on login to
+     *           select a tenant.
+     *   `false` — tenant-less single-plan B2C: no tenant gate, no onboarding
+     *           bounce; an authenticated platform token always proceeds, and
+     *           loginGuard sends any authenticated user to the dashboard.
+     * @default true
+     */
+    requireTenant: boolean;
 }
 
 /**
@@ -47,6 +58,8 @@ export interface NgxGuardConfigInput {
     routes?: Partial<NgxGuardRoutes>;
     exchangeEndpoint?: string;
     subscriptionStatusEndpoint?: string;
+    /** See {@link NgxGuardConfig.requireTenant}. @default true */
+    requireTenant?: boolean;
 }
 
 /** Sensible defaults; consuming apps override via `provideNgxStoneScriptPhpClient`'s 3rd arg. */
@@ -58,5 +71,6 @@ export const DEFAULT_GUARD_CONFIG: NgxGuardConfig = {
         subscriptionError: '/subscription-error'
     },
     exchangeEndpoint: 'api/auth/exchange',
-    subscriptionStatusEndpoint: 'subscription/status'
+    subscriptionStatusEndpoint: 'subscription/status',
+    requireTenant: true
 };

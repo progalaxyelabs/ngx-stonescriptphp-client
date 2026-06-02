@@ -39,13 +39,18 @@ export function isOnboardingPath(url: string, routes: NgxGuardRoutes): boolean {
  *  1. not authenticated            → redirect login
  *  2. token is not yet a platform  → exchange identity→platform; on failure → login
  *     token                          (a platform token is NOT re-exchanged — #2811 seam)
- *  3. no tenant & not onboarding   → redirect onboarding
+ *  3. tenant-aware mode only: no tenant & not onboarding → redirect onboarding
  *  4. otherwise                    → allow
+ *
+ * The exchange-before-API step (1–2) is tenant-independent and always runs.
+ * The tenant gate (3) applies only when `requireTenant` is true (default);
+ * tenant-less single-plan B2C consumers set it false and skip the gate.
  */
 export async function evaluateAuthGuard(ctx: {
     isAuthenticated: boolean;
     url: string;
     routes: NgxGuardRoutes;
+    requireTenant?: boolean;
     getPayload: () => Record<string, any> | null;
     exchange: () => Promise<{ success: boolean }>;
 }): Promise<GuardDecision> {
@@ -62,7 +67,8 @@ export async function evaluateAuthGuard(ctx: {
         payload = ctx.getPayload();
     }
 
-    if (!hasTenant(payload) && !isOnboardingPath(ctx.url, ctx.routes)) {
+    const requireTenant = ctx.requireTenant !== false; // default true
+    if (requireTenant && !hasTenant(payload) && !isOnboardingPath(ctx.url, ctx.routes)) {
         return deny(ctx.routes.onboarding);
     }
 
@@ -71,15 +77,21 @@ export async function evaluateAuthGuard(ctx: {
 
 /**
  * loginGuard decision (SPEC §7.1):
- *  - authenticated WITH tenant → redirect dashboard
- *  - otherwise (no tenant, or unauthenticated) → allow
+ *  - tenant-aware (default): authenticated WITH tenant → dashboard; otherwise allow
+ *    (a tenant-less authenticated user stays on login to select a tenant).
+ *  - tenant-less (`requireTenant` false): any authenticated user → dashboard
+ *    (never sit a logged-in user on the login page; there is no tenant to pick).
  */
 export function evaluateLoginGuard(ctx: {
     isAuthenticated: boolean;
     routes: NgxGuardRoutes;
+    requireTenant?: boolean;
     getPayload: () => Record<string, any> | null;
 }): GuardDecision {
-    if (ctx.isAuthenticated && hasTenant(ctx.getPayload())) {
+    const requireTenant = ctx.requireTenant !== false; // default true
+    const redirectToDashboard = ctx.isAuthenticated &&
+        (requireTenant ? hasTenant(ctx.getPayload()) : true);
+    if (redirectToDashboard) {
         return deny(ctx.routes.dashboard);
     }
     return ALLOW;

@@ -113,6 +113,39 @@ test('authGuard: platform token, no tenant, ON onboarding path → allow', async
     assert.deepStrictEqual(d, { allow: true });
 });
 
+// ── authGuard tenant modes (v2.5.0) ─────────────────────────────────────────
+test('authGuard tenant-aware (default): platform token, no tenant → onboarding', async () => {
+    const d = await evaluateAuthGuard({
+        isAuthenticated: true, url: '/workspaces', routes, // requireTenant omitted → default true
+        getPayload: () => platformNoTenant,
+        exchange: async () => ({ success: true })
+    });
+    assert.deepStrictEqual(d, { allow: false, redirectTo: '/onboarding' });
+});
+
+test('authGuard tenant-less (requireTenant:false): platform token, no tenant → allow', async () => {
+    let exchanged = 0;
+    const d = await evaluateAuthGuard({
+        isAuthenticated: true, url: '/workspaces', routes, requireTenant: false,
+        getPayload: () => platformNoTenant,
+        exchange: async () => { exchanged++; return { success: true }; }
+    });
+    assert.deepStrictEqual(d, { allow: true });
+    assert.strictEqual(exchanged, 0, 'platform token still not re-exchanged in tenant-less mode');
+});
+
+test('authGuard tenant-less: identity token still exchanges, then allows (no tenant gate)', async () => {
+    let exchanged = 0;
+    let payload: Record<string, any> = identityToken;
+    const d = await evaluateAuthGuard({
+        isAuthenticated: true, url: '/workspaces', routes, requireTenant: false,
+        getPayload: () => payload,
+        exchange: async () => { exchanged++; payload = { token_type: 'platform' }; return { success: true }; }
+    });
+    assert.deepStrictEqual(d, { allow: true });
+    assert.strictEqual(exchanged, 1, 'exchange-before-API is tenant-independent');
+});
+
 // ── loginGuard matrix ─────────────────────────────────────────────────────────
 test('loginGuard: authenticated + tenant → redirect dashboard', () => {
     const d = evaluateLoginGuard({ isAuthenticated: true, routes, getPayload: () => platformWithTenant });
@@ -127,6 +160,18 @@ test('loginGuard: authenticated, no tenant → allow', () => {
 test('loginGuard: unauthenticated → allow', () => {
     const d = evaluateLoginGuard({ isAuthenticated: false, routes, getPayload: () => null });
     assert.deepStrictEqual(d, { allow: true });
+});
+
+test('loginGuard tenant-aware (default): authenticated, no tenant → allow (stay to pick tenant)', () => {
+    const d = evaluateLoginGuard({ isAuthenticated: true, routes, getPayload: () => platformNoTenant });
+    assert.deepStrictEqual(d, { allow: true });
+});
+
+test('loginGuard tenant-less (requireTenant:false): authenticated, no tenant → redirect dashboard', () => {
+    const d = evaluateLoginGuard({
+        isAuthenticated: true, routes, requireTenant: false, getPayload: () => platformNoTenant
+    });
+    assert.deepStrictEqual(d, { allow: false, redirectTo: '/dashboard' });
 });
 
 // ── subscriptionGuard matrix ───────────────────────────────────────────────────

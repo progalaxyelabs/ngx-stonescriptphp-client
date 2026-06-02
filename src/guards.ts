@@ -57,6 +57,7 @@ export const authGuard: CanActivateFn = async (_route, state): Promise<boolean |
         isAuthenticated: auth.isAuthenticated(),
         url: state.url,
         routes: cfg.routes,
+        requireTenant: cfg.requireTenant,
         getPayload: () => tokens.decodeJwtPayload(),
         exchange: () => auth.exchangeToken(cfg.exchangeEndpoint)
     });
@@ -75,6 +76,7 @@ export const loginGuard: CanActivateFn = (): boolean | UrlTree => {
     const decision = evaluateLoginGuard({
         isAuthenticated: auth.isAuthenticated(),
         routes: cfg.routes,
+        requireTenant: cfg.requireTenant,
         getPayload: () => tokens.decodeJwtPayload()
     });
     return toResult(decision, router);
